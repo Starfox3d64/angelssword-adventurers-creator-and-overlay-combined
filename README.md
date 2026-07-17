@@ -45,7 +45,7 @@ Everything runs **locally on your PC**.
 
 ### Creator
 - Sprite Prep (upload or AI generate)
-- AI Video Generation (Gemini)
+- AI Video Generation (Gemini) (Support for Grok and Chatgbt untested)
 - Video Preparation (loops, concat, crossfade)
 - Model Exporter (chroma key + transparent WebM/GIF)
 
