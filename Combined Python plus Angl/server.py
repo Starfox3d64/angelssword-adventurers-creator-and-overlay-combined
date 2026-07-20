@@ -38,7 +38,7 @@ CREATOR_PUBLIC = APP_DIR / "creator_public"
 BIN_DIR = CREATOR_PUBLIC / "bin"
 
 # ── Startup Checks ─────────────────────────────────────────────────────────
-VERSION = "1.4 - Combined Edition"
+VERSION = "1.5 - Combined Edition"
 LAST_UPDATED = "July 20, 2026"
 
 
@@ -929,12 +929,12 @@ def landing():
         <title>⚔️ AS Adventurer — Combined</title>
         <style>
             :root {
-                --bg-deep: #1a1a2e;
-                --bg-panel: #16213e;
-                --accent-gold: #dbb858;
-                --accent-gold-glow: rgba(219, 184, 88, 0.3);
-                --text: #e0e0e0;
-                --text-muted: #8899aa;
+                --bg-deep: #050505;
+                --bg-panel: #0c0c0c;
+                --accent-gold: #d4af37;
+                --accent-gold-glow: rgba(212, 175, 55, 0.45);
+                --text: #e8e4d9;
+                --text-muted: #9a9178;
             }
             
             body {
@@ -986,7 +986,7 @@ def landing():
             
             .card {
                 background: var(--bg-panel);
-                border: 1px solid rgba(219, 184, 88, 0.2);
+                border: 1px solid rgba(212, 175, 55, 0.25);
                 border-radius: 12px;
                 padding: 32px 28px;
                 width: 300px;
