@@ -23,7 +23,9 @@
         <a class="btn ghost" href="/creator">🎨 Creator</a>
         <a class="btn ghost" href="/overlay">🎮 Overlay</a>
         <button class="btn" id="btnImport">📂 Import Model</button>
-        <button class="btn primary" id="btnExportRuntime">💾 Export Runtime JSON</button>
+        <button class="btn" id="btnExportRuntime">💾 Export JSON</button>
+        <button class="btn primary" id="btnExportVTS" title="Zip for VTube Studio / PrprLive">📦 Export VTS / PrprLive</button>
+        <button class="btn" id="btnExportFrames" title="Extract PNG frames from video">🎞 Export Frames</button>
       </div>
     </header>
 
@@ -149,6 +151,8 @@
           </div>
           <div class="row">
             <button class="btn sm" id="btnLoadCreatorMedia">📂 Creator Media Library</button>
+            <button class="btn sm primary" id="btnExportMediaVTS">📦 Dump to VTS/PrprLive</button>
+            <button class="btn sm" id="btnExportMediaFrames">🎞 Frames ZIP</button>
           </div>
           <div id="mediaLibrary" class="scroll"></div>
         </div>

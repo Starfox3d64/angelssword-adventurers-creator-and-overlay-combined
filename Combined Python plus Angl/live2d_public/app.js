@@ -344,3 +344,109 @@ window.addEventListener('DOMContentLoaded',()=>{initPixi();tick();setInterval(ti
     refreshMediaLibrary();
   });
 })();
+
+/* ── Export VTS / PrprLive packages ───────────────────────────────── */
+(function(){
+  const $ = (id) => document.getElementById(id);
+  let lastMediaPath = null; // relative name in /live2d/media/
+  let lastModelFolder = null;
+
+  // Track media path when showing from library
+  const _show = window.__donShowMedia;
+  // Patch library click is already in previous IIFE — observe stModel + url
+  const origFetch = window.fetch;
+
+  async function downloadZip(url, body, fallbackName){
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {})
+    });
+    if (!res.ok) {
+      let err = {};
+      try { err = await res.json(); } catch(_){}
+      throw new Error(err.error || ('HTTP ' + res.status));
+    }
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const cd = res.headers.get('Content-Disposition') || '';
+    const m = cd.match(/filename="?([^"]+)"?/i);
+    a.download = m ? m[1] : (fallbackName || 'export.zip');
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function currentMediaPath(){
+    // Prefer path from library selection stored on window
+    if (window.__donMediaPath) return window.__donMediaPath;
+    const label = ($('stModel') && $('stModel').textContent) || '';
+    // if label looks like a filename
+    if (/\.(png|webm|gif|mp4|mov|webp|jpe?g)$/i.test(label.trim())) return label.trim();
+    return lastMediaPath;
+  }
+
+  function currentModelFolder(){
+    if (window.__donModelFolder) return window.__donModelFolder;
+    const label = ($('stModel') && $('stModel').textContent) || '';
+    if (label.includes('/')) return label.split('/')[0];
+    return lastModelFolder;
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    $('btnExportVTS')?.addEventListener('click', async () => {
+      try {
+        const folder = currentModelFolder();
+        const media = currentMediaPath();
+        if (folder && !media) {
+          await downloadZip('/api/live2d/export/vts', { modelFolder: folder, name: folder }, folder + '_VTS_PrprLive.zip');
+        } else if (media) {
+          await downloadZip('/api/live2d/export/vts', { mediaPath: media, name: media.replace(/\.[^.]+$/, '') }, 'media_VTS_PrprLive.zip');
+        } else {
+          // try first server model
+          const data = await (await fetch('/api/live2d/models')).json();
+          const list = data.models || [];
+          if (!list.length) { alert('Load a Live2D model or Creator media first.'); return; }
+          const name = list.length === 1 ? list[0] : prompt('Model folder to pack:\n' + list.join('\n'), list[0]);
+          if (!name) return;
+          await downloadZip('/api/live2d/export/vts', { modelFolder: name, name }, name + '_VTS_PrprLive.zip');
+        }
+        alert('VTS / PrprLive zip downloaded.\nUnzip into VTube Studio Live2DModels folder (or PrprLive models).');
+      } catch (e) { alert('Export failed: ' + e.message); }
+    });
+
+    $('btnExportMediaVTS')?.addEventListener('click', async () => {
+      try {
+        const media = currentMediaPath();
+        if (!media) { alert('Open a Creator media file first (Media tab / library).'); return; }
+        await downloadZip('/api/live2d/export/vts', { mediaPath: media, name: media.replace(/\.[^.]+$/, '') }, 'media_VTS_PrprLive.zip');
+      } catch (e) { alert('Export failed: ' + e.message); }
+    });
+
+    $('btnExportFrames')?.addEventListener('click', async () => {
+      try {
+        const media = currentMediaPath();
+        if (!media) { alert('Select a WebM/MP4/GIF media file first.'); return; }
+        await downloadZip('/api/live2d/export/frames', { mediaPath: media, fps: 8, maxFrames: 60 }, 'frames.zip');
+      } catch (e) { alert('Frame export failed: ' + e.message); }
+    });
+    $('btnExportMediaFrames')?.addEventListener('click', () => $('btnExportFrames')?.click());
+
+    // When media library items are clicked, remember path
+    const obs = new MutationObserver(() => {
+      document.querySelectorAll('.media-lib-item').forEach(el => {
+        if (el.dataset.bound) return;
+        el.dataset.bound = '1';
+        el.addEventListener('click', () => {
+          const url = el.dataset.url || '';
+          // /live2d/media/filename
+          const path = url.replace(/^\/live2d\/media\//, '');
+          window.__donMediaPath = path;
+          lastMediaPath = path;
+        });
+      });
+    });
+    const lib = $('mediaLibrary');
+    if (lib) obs.observe(lib, { childList: true, subtree: true });
+  });
+})();
