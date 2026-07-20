@@ -23,6 +23,11 @@ import os
 import json
 import asyncio
 import threading
+import tempfile
+import shutil
+import subprocess
+import uuid
+import time
 import requests as http_requests
 from pathlib import Path
 from flask import Flask, send_from_directory, request, jsonify, Response
@@ -33,7 +38,7 @@ CREATOR_PUBLIC = APP_DIR / "creator_public"
 BIN_DIR = CREATOR_PUBLIC / "bin"
 
 # ── Startup Checks ─────────────────────────────────────────────────────────
-VERSION = "1.2 - Combined Edition"
+VERSION = "1.4 - Combined Edition"
 LAST_UPDATED = "July 20, 2026"
 
 
@@ -308,17 +313,44 @@ def grok_video_generate():
 
         print(f"[Grok Video] Request received | Prompt: {prompt[:60]}... | {duration}s | {aspect_ratio}")
 
-        # Placeholder for actual xAI video endpoint (update when public API is stable)
-        # Currently returns a structured response so the frontend can continue.
-        return jsonify({
-            "success": True,
-            "provider": "grok",
-            "message": "Grok video generation request accepted",
-            "prompt": prompt,
-            "duration": duration,
-            "aspectRatio": aspect_ratio,
-            "note": "Full xAI video generation will be wired when the public endpoint is finalized."
-        })
+        # Try xAI video generations endpoint (may 404 if not yet public for this key)
+        try:
+            resp = http_requests.post(
+                "https://api.x.ai/v1/videos/generations",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "grok-imagine-video",
+                    "prompt": prompt,
+                    "duration": duration,
+                    "aspect_ratio": aspect_ratio,
+                },
+                timeout=120,
+            )
+            if resp.ok:
+                return Response(resp.content, status=resp.status_code, content_type="application/json")
+            # Fall through with details if endpoint exists but rejected
+            try:
+                err_body = resp.json()
+            except Exception:
+                err_body = {"raw": resp.text[:500]}
+            print(f"[Grok Video] Upstream {resp.status_code}: {err_body}")
+            return jsonify({
+                "success": False,
+                "provider": "grok",
+                "error": err_body.get("error", {}).get("message") if isinstance(err_body.get("error"), dict) else err_body.get("error") or f"xAI video HTTP {resp.status_code}",
+                "status": resp.status_code,
+                "hint": "If video API is not enabled on your key, use Gemini video or ComfyUI. Image generation via Grok still works in Sprite Prep."
+            }), 502
+        except http_requests.exceptions.RequestException as e:
+            return jsonify({
+                "success": False,
+                "provider": "grok",
+                "error": str(e),
+                "hint": "Network error calling xAI. Check your connection and API key."
+            }), 502
 
     except Exception as e:
         print(f"[ERROR] Grok video generation failed: {str(e)}")
@@ -380,6 +412,214 @@ def comfyui_status():
         return jsonify({"available": False, "status": "error", "code": resp.status_code})
     except Exception:
         return jsonify({"available": False, "status": "offline", "url": COMFYUI_BASE})
+
+
+
+
+# ── xAI (Grok) Full Proxy Routes ──────────────────────────────────────────
+@app.route("/api/xai/<path:subpath>", methods=["GET", "POST", "PUT", "DELETE"])
+def api_xai_proxy(subpath):
+    """Generic proxy to api.x.ai — used for image/video when public endpoints exist."""
+    try:
+        auth = request.headers.get("Authorization", "")
+        if not auth:
+            # Accept body/header key
+            data = request.get_json(silent=True) or {}
+            key = data.get("apiKey") or request.headers.get("X-Grok-Key")
+            if key:
+                auth = f"Bearer {key}"
+        if not auth:
+            return jsonify({"error": "Authorization required"}), 401
+
+        url = f"https://api.x.ai/v1/{subpath}"
+        if request.query_string:
+            url += "?" + request.query_string.decode()
+
+        headers = {
+            "Authorization": auth,
+            "Content-Type": request.headers.get("Content-Type", "application/json"),
+        }
+
+        if request.method == "GET":
+            resp = http_requests.get(url, headers=headers, timeout=120)
+        elif request.method == "POST":
+            resp = http_requests.post(url, headers=headers, data=request.get_data(), timeout=300)
+        elif request.method == "PUT":
+            resp = http_requests.put(url, headers=headers, data=request.get_data(), timeout=120)
+        else:
+            resp = http_requests.delete(url, headers=headers, timeout=60)
+
+        return Response(resp.content, status=resp.status_code,
+                        content_type=resp.headers.get("Content-Type", "application/json"))
+    except Exception as e:
+        print(f"[ERROR] xAI proxy: {e}")
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/xai/fetch-url", methods=["POST"])
+def api_xai_fetch_url():
+    """Download a temporary xAI media URL server-side (avoids browser CORS)."""
+    try:
+        auth = request.headers.get("Authorization", "")
+        data = request.get_json() or {}
+        if not auth:
+            key = data.get("apiKey") or request.headers.get("X-Grok-Key")
+            if key:
+                auth = f"Bearer {key}"
+        target = data.get("url")
+        if not target:
+            return jsonify({"error": "url required"}), 400
+        from urllib.parse import urlparse
+        host = urlparse(target).hostname or ""
+        if not (host.endswith(".x.ai") or host == "x.ai" or "x.ai" in host):
+            return jsonify({"error": f"URL host not allowed: {host}"}), 400
+
+        resp = http_requests.get(target, headers={"Authorization": auth} if auth else {}, timeout=600)
+        if not resp.ok:
+            return jsonify({"error": f"Download failed HTTP {resp.status_code}"}), resp.status_code
+        return Response(resp.content, status=200,
+                        content_type=resp.headers.get("Content-Type", "application/octet-stream"))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+# ── Transparent WebM Export (ffmpeg session API) ──────────────────────────
+# Client sends chroma-keyed PNG frames; server packs them into VP9 WebM with alpha.
+
+_export_sessions = {}
+FFMPEG_MAX_FRAMES = 2000
+SESSION_TTL_MS = 60 * 60 * 1000
+
+
+def _resolve_ffmpeg():
+    path = get_ffmpeg_path()
+    return path
+
+
+@app.route("/api/export/status")
+def api_export_status():
+    ff = _resolve_ffmpeg()
+    version = None
+    if ff:
+        try:
+            out = subprocess.run([ff, "-version"], capture_output=True, text=True, timeout=8)
+            version = (out.stdout or "").split("\n")[0]
+        except Exception:
+            pass
+    return jsonify({
+        "ffmpeg": bool(ff),
+        "path": ff,
+        "version": version,
+        "maxFrames": FFMPEG_MAX_FRAMES,
+        "streaming": True
+    })
+
+
+@app.route("/api/export/session", methods=["POST"])
+def api_export_session_create():
+    ff = _resolve_ffmpeg()
+    if not ff:
+        return jsonify({
+            "error": "ffmpeg not found. Place ffmpeg.exe in creator_public/bin/ or install system ffmpeg."
+        }), 503
+    session_id = uuid.uuid4().hex
+    tmp = Path(tempfile.mkdtemp(prefix="as-export-"))
+    _export_sessions[session_id] = {"dir": tmp, "frames": 0, "created": time.time()}
+    print(f"[EXPORT] Session {session_id} → {tmp}")
+    return jsonify({"sessionId": session_id, "maxFrames": FFMPEG_MAX_FRAMES})
+
+
+@app.route("/api/export/session/<session_id>/frame", methods=["POST"])
+def api_export_session_frame(session_id):
+    session = _export_sessions.get(session_id)
+    if not session:
+        return jsonify({"error": "Unknown or expired export session"}), 404
+    try:
+        index = int(request.args.get("index", -1))
+    except ValueError:
+        return jsonify({"error": "Invalid frame index"}), 400
+    if index < 0 or index >= FFMPEG_MAX_FRAMES:
+        return jsonify({"error": "Invalid frame index"}), 400
+
+    body = request.get_data()
+    if not body or len(body) < 8 or body[0] != 0x89 or body[1] != 0x50:
+        return jsonify({"error": "Body is not a PNG image"}), 400
+
+    name = f"frame_{index:05d}.png"
+    (session["dir"] / name).write_bytes(body)
+    session["frames"] = max(session["frames"], index + 1)
+    return jsonify({"ok": True, "index": index, "bytes": len(body)})
+
+
+@app.route("/api/export/session/<session_id>/finalize", methods=["POST"])
+def api_export_session_finalize(session_id):
+    session = _export_sessions.pop(session_id, None)
+    if not session:
+        return jsonify({"error": "Unknown or expired export session"}), 404
+
+    ff = _resolve_ffmpeg()
+    if not ff:
+        shutil.rmtree(session["dir"], ignore_errors=True)
+        return jsonify({"error": "ffmpeg not found"}), 503
+
+    data = request.get_json(silent=True) or {}
+    fps = max(1, min(120, int(data.get("fps") or 30)))
+    frame_count = int(data.get("frameCount") or session["frames"])
+    if frame_count < 1:
+        shutil.rmtree(session["dir"], ignore_errors=True)
+        return jsonify({"error": "No frames in session"}), 400
+
+    export_dir = session["dir"]
+    out_path = export_dir / "out.webm"
+
+    # Verify frames exist
+    for i in range(frame_count):
+        if not (export_dir / f"frame_{i:05d}.png").exists():
+            shutil.rmtree(export_dir, ignore_errors=True)
+            return jsonify({"error": f"Missing frame {i}"}), 400
+
+    args = [
+        ff, "-y", "-hide_banner", "-loglevel", "error",
+        "-framerate", str(fps),
+        "-start_number", "0",
+        "-i", str(export_dir / "frame_%05d.png"),
+        "-frames:v", str(frame_count),
+        "-c:v", "libvpx-vp9",
+        "-pix_fmt", "yuva420p",
+        "-auto-alt-ref", "0",
+        "-b:v", "0",
+        "-crf", "28",
+        "-deadline", "good",
+        "-cpu-used", "2",
+        "-an",
+        str(out_path),
+    ]
+    try:
+        print(f"[EXPORT] Finalize {session_id}: {frame_count} frames @ {fps}fps")
+        subprocess.run(args, check=True, timeout=600)
+        if not out_path.exists() or out_path.stat().st_size == 0:
+            raise RuntimeError("ffmpeg produced empty output")
+
+        data_bytes = out_path.read_bytes()
+        shutil.rmtree(export_dir, ignore_errors=True)
+        return Response(
+            data_bytes,
+            status=200,
+            content_type="video/webm",
+            headers={"Content-Disposition": 'attachment; filename="export.webm"'}
+        )
+    except Exception as e:
+        shutil.rmtree(export_dir, ignore_errors=True)
+        print(f"[ERROR] Export finalize failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/export/session/<session_id>", methods=["DELETE"])
+def api_export_session_delete(session_id):
+    session = _export_sessions.pop(session_id, None)
+    if session:
+        shutil.rmtree(session["dir"], ignore_errors=True)
+    return jsonify({"ok": True})
 
 
 
@@ -837,7 +1077,13 @@ def landing():
             </div>
             
             <div class="footer">
-                Everything runs locally on your PC • Supports Gemini • Grok • OpenAI • ComfyUI
+                Everything runs locally on your PC • Supports Gemini • Grok • OpenAI • ComfyUI<br>
+                <span style="display:inline-block;margin-top:10px;">
+                    <a href="/health" style="color:#dbb858;margin:0 8px;">Health</a>
+                    <a href="/api/export/status" style="color:#dbb858;margin:0 8px;">Export Status</a>
+                    <a href="/api/comfyui/status" style="color:#dbb858;margin:0 8px;">ComfyUI Status</a>
+                    <a href="/api/ffmpeg/status" style="color:#dbb858;margin:0 8px;">ffmpeg Status</a>
+                </span>
             </div>
         </div>
     </body>
@@ -868,15 +1114,25 @@ def creator_files(filename):
 @app.route("/health")
 def health():
     ffmpeg = get_ffmpeg_path()
+    # ComfyUI quick check (non-blocking short timeout)
+    comfy_ok = False
+    try:
+        r = http_requests.get("http://127.0.0.1:8188/system_stats", timeout=1.5)
+        comfy_ok = r.ok
+    except Exception:
+        pass
     return {
         "status": "ok",
         "version": VERSION,
         "made_by": "TheDonOfEverything aka Paul Conforti",
         "original": "Leaflit",
         "angular_improvements": "OOzeClues",
-        "ffmpeg": {
-            "available": bool(ffmpeg),
-            "path": ffmpeg
+        "services": {
+            "ffmpeg": {"available": bool(ffmpeg), "path": ffmpeg},
+            "comfyui": {"available": comfy_ok, "url": "http://127.0.0.1:8188"},
+            "websocket": {"port": 3001, "path": "ws://127.0.0.1:3001"},
+            "export_api": True,
+            "xai_proxy": True
         }
     }
 
