@@ -9,7 +9,7 @@ async function ingestFiles(list){
   for(const f of [...list]){
     const name=(f.webkitRelativePath||f.name);
     const low=name.toLowerCase();
-    if(low.endsWith('.cmo3')||low.endsWith('.can3')){alert(name+' is Cubism Editor project. Export for Runtime first.');continue;}
+    if(low.endsWith('.cmo3')||low.endsWith('.can3')){alert(name+' is a Cubism EDITOR project (.cmo3), not a runtime model.\n\nIn Cubism Editor: File → Export for Runtime\nThen load the folder with .model3.json + .moc3 + texture PNGs.\n\n.cmo3 will never open in this viewer.');continue;}
     if(low.endsWith('.zip')){await ingestZip(f);continue;}
     files.set(name.split(/[/\\]/).pop(),f); files.set(name,f);
   }
@@ -24,11 +24,38 @@ async function ingestZip(file){
     await loadServer(data.path||data.name);
   }catch(e){alert('Zip failed: '+e.message+'\nDrop unzipped files instead.');}
 }
+function withTimeout(promise, ms, msg){
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(msg || ('Timed out after ' + ms + 'ms'))), ms);
+    promise.then(v => { clearTimeout(t); resolve(v); }, e => { clearTimeout(t); reject(e); });
+  });
+}
 async function autoLoad(){
   let key=null;
   for(const k of files.keys()){if(k.toLowerCase().endsWith('.model3.json')){key=k;break;}}
-  if(!key){treeFiles();return;}
-  modelJson=JSON.parse(await files.get(key).text());
+  // Wrong file types: plain .json that is not model3
+  if(!key){
+    const jsons=[...files.keys()].filter(k=>k.toLowerCase().endsWith('.json'));
+    if(jsons.length){
+      $("viewportHint").style.display='flex';
+      $("viewportHint").innerHTML='Found JSON but <b>not</b> a <code>.model3.json</code> runtime file.<br><span class="dim">Need Cubism <b>Export for Runtime</b>: model3.json + moc3 + textures. .cmo3 will never load here.</span>';
+      $("stModel").textContent='Invalid package';
+    }
+    treeFiles();
+    return;
+  }
+  try{
+    modelJson=JSON.parse(await files.get(key).text());
+  }catch(e){
+    $("viewportHint").innerHTML='Invalid model3.json: '+ (e.message||e);
+    return;
+  }
+  if(!modelJson.FileReferences || !modelJson.FileReferences.Moc){
+    $("viewportHint").style.display='flex';
+    $("viewportHint").innerHTML='JSON is not a Live2D <b>runtime</b> model3 file (missing FileReferences.Moc).<br><span class="dim">Export for Runtime from Cubism Editor.</span>';
+    treeFiles();
+    return;
+  }
   $("stModel").textContent=key;
   treeModel(modelJson,key);
   fillMotions(modelJson);
@@ -66,7 +93,9 @@ async function mount(key,json){
   const url=URL.createObjectURL(new Blob([JSON.stringify(j)],{type:'application/json'}));
   try{
     if(model){app.stage.removeChild(model);model.destroy({children:true});}
-    model=await PIXI.live2d.Live2DModel.from(url);
+    $("viewportHint").style.display='flex';
+    $("viewportHint").textContent='Loading Live2D model…';
+    model=await withTimeout(PIXI.live2d.Live2DModel.from(url), 45000, 'Live2D load timed out (missing .moc3 / textures, or CDN blocked).');
     app.stage.addChild(model); model.anchor.set(0.5,0.5);
     model.x=app.renderer.width/2; model.y=app.renderer.height*0.55;
     scale=Math.min(app.renderer.width,app.renderer.height)/900; model.scale.set(scale);
@@ -140,7 +169,7 @@ async function loadServer(name){
   if(!PIXI.live2d){alert('Runtime missing');return;}
   const url=base+data.model3;
   if(model){app.stage.removeChild(model);model.destroy({children:true});}
-  model=await PIXI.live2d.Live2DModel.from(url);
+  model=await withTimeout(PIXI.live2d.Live2DModel.from(url), 45000, "Live2D load timed out");
   app.stage.addChild(model);model.anchor.set(0.5,0.5);
   model.x=app.renderer.width/2;model.y=app.renderer.height*0.55;
   scale=Math.min(app.renderer.width,app.renderer.height)/900;model.scale.set(scale);
