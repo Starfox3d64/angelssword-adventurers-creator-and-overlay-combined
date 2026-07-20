@@ -38,7 +38,7 @@ CREATOR_PUBLIC = APP_DIR / "creator_public"
 BIN_DIR = CREATOR_PUBLIC / "bin"
 
 # ── Startup Checks ─────────────────────────────────────────────────────────
-VERSION = "1.6 - Combined Edition"
+VERSION = "1.7 - Combined Edition"
 LAST_UPDATED = "July 20, 2026"
 
 
@@ -413,6 +413,260 @@ def comfyui_status():
     except Exception:
         return jsonify({"available": False, "status": "offline", "url": COMFYUI_BASE})
 
+
+
+
+
+# ── xAI OAuth + Image/Video (from Angular 0.3.0) ─────────────────────────
+XAI_OAUTH_CLIENT_ID = "b1a00492-073a-47ea-816f-4c329264a828"
+XAI_OAUTH_SCOPE = "openid profile email offline_access grok-cli:access api:access"
+XAI_DEVICE_CODE_URL = "https://auth.x.ai/oauth2/device/code"
+XAI_TOKEN_URL = "https://auth.x.ai/oauth2/token"
+
+
+def _xai_auth_header():
+    auth = request.headers.get("Authorization", "")
+    if auth:
+        return auth if auth.lower().startswith("bearer ") else f"Bearer {auth}"
+    data = request.get_json(silent=True) or {}
+    key = data.get("apiKey") or request.headers.get("X-Grok-Key") or request.headers.get("X-Api-Key")
+    if key:
+        return f"Bearer {key}"
+    return None
+
+
+@app.route("/api/xai/oauth/device", methods=["POST"])
+def api_xai_oauth_device():
+    """Start SuperGrok device-code login (Angular 0.3.0 compatible)."""
+    try:
+        body = {
+            "client_id": XAI_OAUTH_CLIENT_ID,
+            "scope": XAI_OAUTH_SCOPE,
+            "referrer": "as-adventurer",
+        }
+        resp = http_requests.post(
+            XAI_DEVICE_CODE_URL,
+            data=body,
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "x-grok-client-version": "1.0.0",
+                "x-grok-client-surface": "cli",
+            },
+            timeout=30,
+        )
+        return Response(resp.content, status=resp.status_code, content_type="application/json")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/xai/oauth/token", methods=["POST"])
+def api_xai_oauth_token():
+    """Poll device_code or refresh SuperGrok token."""
+    try:
+        data = request.get_json(silent=True) or {}
+        params = {"client_id": XAI_OAUTH_CLIENT_ID}
+        params.update({k: str(v) for k, v in data.items() if v is not None})
+        resp = http_requests.post(
+            XAI_TOKEN_URL,
+            data=params,
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "x-grok-client-version": "1.0.0",
+                "x-grok-client-surface": "cli",
+            },
+            timeout=30,
+        )
+        return Response(resp.content, status=resp.status_code, content_type="application/json")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/xai/models", methods=["GET"])
+def api_xai_models():
+    auth = _xai_auth_header()
+    if not auth:
+        return jsonify({"error": "No xAI Authorization"}), 401
+    try:
+        resp = http_requests.get(
+            "https://api.x.ai/v1/models",
+            headers={"Authorization": auth},
+            timeout=30,
+        )
+        return Response(resp.content, status=resp.status_code, content_type="application/json")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/xai/test", methods=["POST"])
+def api_xai_test():
+    """Connection test via tiny chat completion (better than /models for scoped keys)."""
+    auth = _xai_auth_header()
+    if not auth:
+        return jsonify({"error": "No xAI Authorization"}), 401
+    try:
+        resp = http_requests.post(
+            "https://api.x.ai/v1/chat/completions",
+            headers={"Authorization": auth, "Content-Type": "application/json"},
+            json={
+                "model": "grok-3",
+                "messages": [{"role": "user", "content": "ping"}],
+                "max_tokens": 3,
+            },
+            timeout=45,
+        )
+        if resp.ok:
+            return jsonify({"ok": True, "status": resp.status_code})
+        # Fallback: models list
+        m = http_requests.get(
+            "https://api.x.ai/v1/models",
+            headers={"Authorization": auth},
+            timeout=20,
+        )
+        if m.ok:
+            return jsonify({"ok": True, "status": m.status_code, "via": "models"})
+        return Response(resp.content, status=resp.status_code, content_type="application/json")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/xai/images/generations", methods=["POST"])
+def api_xai_images_generations():
+    auth = _xai_auth_header()
+    if not auth:
+        return jsonify({"error": "No xAI Authorization"}), 401
+    try:
+        data = request.get_json(silent=True) or {}
+        resp = http_requests.post(
+            "https://api.x.ai/v1/images/generations",
+            headers={"Authorization": auth, "Content-Type": "application/json"},
+            json=data,
+            timeout=180,
+        )
+        return Response(resp.content, status=resp.status_code, content_type="application/json")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/xai/images/edits", methods=["POST"])
+def api_xai_images_edits():
+    auth = _xai_auth_header()
+    if not auth:
+        return jsonify({"error": "No xAI Authorization"}), 401
+    try:
+        data = request.get_json(silent=True) or {}
+        # Prefer images/edits; some accounts use generations with image refs
+        resp = http_requests.post(
+            "https://api.x.ai/v1/images/edits",
+            headers={"Authorization": auth, "Content-Type": "application/json"},
+            json=data,
+            timeout=180,
+        )
+        if resp.status_code == 404:
+            resp = http_requests.post(
+                "https://api.x.ai/v1/images/generations",
+                headers={"Authorization": auth, "Content-Type": "application/json"},
+                json=data,
+                timeout=180,
+            )
+        return Response(resp.content, status=resp.status_code, content_type="application/json")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/xai/videos/<path:request_id>", methods=["GET"])
+def api_xai_videos_poll(request_id):
+    auth = _xai_auth_header()
+    if not auth:
+        return jsonify({"error": "No xAI Authorization"}), 401
+    try:
+        resp = http_requests.get(
+            f"https://api.x.ai/v1/videos/{request_id}",
+            headers={"Authorization": auth},
+            timeout=60,
+        )
+        return Response(resp.content, status=resp.status_code, content_type="application/json")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/xai/videos/generations", methods=["POST"])
+def api_xai_videos_generations():
+    auth = _xai_auth_header()
+    if not auth:
+        return jsonify({"error": "No xAI Authorization"}), 401
+    try:
+        data = request.get_json(silent=True) or {}
+        resp = http_requests.post(
+            "https://api.x.ai/v1/videos/generations",
+            headers={"Authorization": auth, "Content-Type": "application/json"},
+            json=data,
+            timeout=180,
+        )
+        return Response(resp.content, status=resp.status_code, content_type="application/json")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+# ── ComfyUI high-level routes (Angular 0.3.0 compatible aliases) ─────────
+_comfy_state = {"base_url": "http://127.0.0.1:8188", "connected": False}
+
+
+@app.route("/api/comfy/status", methods=["GET"])
+def api_comfy_status():
+    base = _comfy_state.get("base_url") or "http://127.0.0.1:8188"
+    try:
+        r = http_requests.get(f"{base.rstrip('/')}/system_stats", timeout=2)
+        ok = r.ok
+        _comfy_state["connected"] = ok
+        return jsonify({"available": ok, "connected": ok, "url": base, "status": "online" if ok else "error"})
+    except Exception:
+        _comfy_state["connected"] = False
+        return jsonify({"available": False, "connected": False, "url": base, "status": "offline"})
+
+
+@app.route("/api/comfy/connect", methods=["POST"])
+def api_comfy_connect():
+    data = request.get_json(silent=True) or {}
+    url = (data.get("url") or data.get("baseUrl") or "http://127.0.0.1:8188").strip()
+    if not url.startswith("http"):
+        url = "http://" + url
+    _comfy_state["base_url"] = url.rstrip("/")
+    try:
+        r = http_requests.get(f"{_comfy_state['base_url']}/system_stats", timeout=3)
+        _comfy_state["connected"] = r.ok
+        return jsonify({"ok": r.ok, "url": _comfy_state["base_url"], "connected": r.ok})
+    except Exception as e:
+        _comfy_state["connected"] = False
+        return jsonify({"ok": False, "url": _comfy_state["base_url"], "error": str(e)}), 503
+
+
+@app.route("/api/comfy/disconnect", methods=["POST"])
+def api_comfy_disconnect():
+    _comfy_state["connected"] = False
+    return jsonify({"ok": True, "connected": False})
+
+
+@app.route("/api/comfy/test", methods=["POST"])
+def api_comfy_test():
+    return api_comfy_status()
+
+
+@app.route("/api/comfy/models", methods=["GET"])
+def api_comfy_models():
+    base = _comfy_state.get("base_url") or "http://127.0.0.1:8188"
+    try:
+        r = http_requests.get(f"{base.rstrip('/')}/object_info", timeout=15)
+        if not r.ok:
+            return jsonify({"error": "object_info failed", "status": r.status_code}), r.status_code
+        info = r.json()
+        ckpts = []
+        try:
+            ckpts = info.get("CheckpointLoaderSimple", {}).get("input", {}).get("required", {}).get("ckpt_name", [[]])[0]
+        except Exception:
+            pass
+        return jsonify({"checkpoints": ckpts or [], "object_info_keys": list(info.keys())[:50]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
 
 
 
