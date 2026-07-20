@@ -247,17 +247,50 @@
                         <div class="glass-panel">
                             <div class="panel-title"><span class="title-icon">🎯</span> Generation Settings</div>
 
-                            <!-- AI Provider Selector -->
+                            <!-- Generation Source Selector (matches OOzeClues style) -->
                             <div class="form-row" style="margin-bottom: 16px;">
-                                <label for="aiProvider">AI Provider</label>
-                                <select id="aiProvider" class="form-select" style="width: 100%; max-width: 300px;">
-                                    <option value="gemini">Gemini (Google) - Recommended for Video</option>
-                                    <option value="openai">ChatGPT (OpenAI)</option>
-                                    <option value="grok">Grok (xAI)</option>
-                                </select>
-                                <small style="color: #8899aa; display: block; margin-top: 4px;">
-                                    Choose which AI to use for image & video generation. Keys are saved in Settings.
+                                <label>Generation Source</label>
+                                <div class="mode-selector" id="sgSourceSelector" style="display:flex; gap:8px; flex-wrap:wrap;">
+                                    <button class="mode-btn active" data-source="openai" title="OpenAI GPT Image">⭐ GPT Image 2</button>
+                                    <button class="mode-btn" data-source="gemini" title="Google Gemini Image">✨ Gemini Image</button>
+                                    <button class="mode-btn" data-source="grok" title="Grok Imagine (xAI)">🧠 Grok Imagine</button>
+                                    <button class="mode-btn" data-source="comfyui" title="Local ComfyUI">🖥️ Local ComfyUI</button>
+                                </div>
+                                <small id="sgSourceHint" style="color:#8899aa; display:block; margin-top:6px;">
+                                    GPT Image 2 — best for chroma-key sprites (requires OpenAI API key in Settings).
                                 </small>
+                            </div>
+
+                            <!-- Local ComfyUI Panel (shown when Local ComfyUI is selected) -->
+                            <div id="sgComfyPanel" class="glass-panel" style="display:none; margin-bottom:16px; border:1px solid rgba(219,184,88,0.25);">
+                                <div class="panel-title"><span class="title-icon">🖥️</span> Local ComfyUI</div>
+                                <div class="form-row">
+                                    <label for="sgComfyUrl">ComfyUI URL</label>
+                                    <div style="display:flex; gap:8px; align-items:center;">
+                                        <input type="text" id="sgComfyUrl" value="http://127.0.0.1:8188" style="flex:1;" title="Address of your local ComfyUI instance">
+                                        <button class="btn btn-sm btn-secondary" id="sgComfyOpen" title="Open ComfyUI in browser">Open</button>
+                                        <button class="btn btn-sm btn-secondary" id="sgComfyRefresh" title="Check connection">Refresh</button>
+                                    </div>
+                                    <small id="sgComfyStatus" style="color:#8899aa; display:block; margin-top:4px;">Status: unknown</small>
+                                </div>
+                                <div class="form-row">
+                                    <label for="sgComfyWorkflow">Image workflow</label>
+                                    <select id="sgComfyWorkflow" class="form-select">
+                                        <option value="sdxl_simple">SDXL Simple</option>
+                                        <option value="sdxl_refiner">SDXL + Refiner</option>
+                                        <option value="custom">Custom (use active workflow in ComfyUI)</option>
+                                    </select>
+                                    <small style="color:#8899aa; display:block; margin-top:4px;">
+                                        Generate high-quality images using your local ComfyUI workflows.
+                                    </small>
+                                </div>
+                                <div class="form-row" style="display:flex; align-items:center; gap:10px;">
+                                    <label class="toggle-switch" title="Unload models after run to free VRAM">
+                                        <input type="checkbox" id="sgComfyUnload">
+                                        <span class="slider"></span>
+                                    </label>
+                                    <label for="sgComfyUnload" style="margin:0;">Unload models before run</label>
+                                </div>
                             </div>
 
                             <div class="form-row">
@@ -1016,20 +1049,179 @@
                     <div id="settingsGoogleStatus"></div>
                 </div>
 
-                <!-- Grok (xAI) API Key -->
+                <!-- Grok Imagine -->
                 <div class="glass-panel">
-                    <div class="panel-title"><span class="title-icon">🧠</span> Grok (xAI) API Key</div>
-                    <div class="panel-subtitle">Required for Grok-powered generation. Your key is stored locally and never sent to any third party.</div>
-
-                    <div class="api-key-row">
-                        <div class="input-password">
-                            <input type="password" id="settingsGrokKey" placeholder="xai-..." title="Your xAI Grok API key">
-                            <button class="toggle-vis" id="settingsGrokToggle" title="Show/hide key">👁️</button>
-                        </div>
-                        <button class="btn btn-sm btn-secondary" id="settingsGrokSave" title="Save key to browser storage">Save</button>
-                        <button class="btn btn-sm btn-accent" id="settingsGrokTest" title="Test the API connection">Test</button>
+                    <div class="panel-title"><span class="title-icon">⚡</span> Grok Imagine</div>
+                    <div class="panel-subtitle">
+                        Use Grok Imagine for image + video via an xAI API key or SuperGrok / X Premium+ subscription.
+                        Both can be configured; the master toggle chooses which backend every Grok generation uses.
                     </div>
-                    <div id="settingsGrokStatus"></div>
+
+                    <div class="form-row">
+                        <label>Active Grok backend</label>
+                        <div class="mode-selector" id="settingsGrokBackend">
+                            <button class="mode-btn active" data-backend="api" title="Use xAI API key">🔑 API Key</button>
+                            <button class="mode-btn" data-backend="oauth" title="Use SuperGrok OAuth session">✨ SuperGrok (OAuth)</button>
+                        </div>
+                        <div id="settingsGrokBackendStatus" class="status-msg info" style="margin-top:8px;">
+                            Active backend: API Key
+                        </div>
+                    </div>
+
+                    <hr class="gold-divider">
+
+                    <div class="form-row">
+                        <label>🔑 xAI API Key</label>
+                        <div class="panel-subtitle" style="margin-bottom:8px;">
+                            Create a key in the xAI console — stored locally only. Used when the backend toggle is set to API Key.
+                        </div>
+                        <div class="api-key-row">
+                            <div class="input-password">
+                                <input type="password" id="settingsGrokKey" placeholder="xai-..." title="Your xAI Grok API key">
+                                <button class="toggle-vis" id="settingsGrokToggle" title="Show/hide key">👁️</button>
+                            </div>
+                            <button class="btn btn-sm btn-secondary" id="settingsGrokSave" title="Save key to browser storage">Save</button>
+                            <button class="btn btn-sm btn-accent" id="settingsGrokTest" title="Test the API connection">Test</button>
+                            <a class="btn btn-sm btn-secondary" href="https://console.x.ai/" target="_blank" title="Open xAI console">Get API Key</a>
+                        </div>
+                        <div id="settingsGrokStatus"></div>
+                    </div>
+
+                    <hr class="gold-divider">
+
+                    <div class="form-row">
+                        <label>✨ SuperGrok OAuth <span id="settingsGrokOAuthBadge" class="text-dim" style="font-size:0.75rem;">(optional)</span></label>
+                        <div class="panel-subtitle" style="margin-bottom:8px;">
+                            Log in with SuperGrok or X Premium+ — no separate xAI API key required.
+                            Tokens stay on this machine and only go to auth.x.ai / api.x.ai via the local proxy.
+                        </div>
+                        <div id="settingsGrokOAuthStatus" class="status-msg info" style="margin-bottom:8px;">
+                            SuperGrok session: not connected
+                        </div>
+                        <div class="btn-group" style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <button class="btn btn-sm btn-accent" id="settingsGrokOAuthTest">Test Connection</button>
+                            <button class="btn btn-sm btn-secondary" id="settingsGrokOAuthRefresh">Refresh Token</button>
+                            <button class="btn btn-sm btn-danger" id="settingsGrokOAuthLogout">Logout</button>
+                        </div>
+                        <small class="text-dim" style="display:block; margin-top:6px;">
+                            Full OAuth browser login can be added later. For now, use an API key for reliable generation.
+                        </small>
+                    </div>
+                </div>
+
+                <!-- Local ComfyUI -->
+                <div class="glass-panel">
+                    <div class="panel-title"><span class="title-icon">🖥️</span> Local ComfyUI</div>
+                    <div class="panel-subtitle">
+                        Use a ComfyUI instance on this machine or your LAN for free local image/video generation.
+                        When connected, Local ComfyUI appears as a provider in Sprite Prep and Generate Video.
+                    </div>
+
+                    <div id="settingsComfyConnStatus" class="status-msg info" style="margin-bottom:10px;">
+                        Status: not connected
+                    </div>
+
+                    <div class="form-row">
+                        <label for="settingsComfyUrl">ComfyUI base URL</label>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                            <input type="text" id="settingsComfyUrl" value="http://127.0.0.1:8188" style="flex:1; min-width:220px;" title="Address of your ComfyUI instance">
+                            <button class="btn btn-sm btn-accent" id="settingsComfyConnect">Connect</button>
+                            <button class="btn btn-sm btn-secondary" id="settingsComfyTest">Test</button>
+                            <button class="btn btn-sm btn-secondary" id="settingsComfyOpen">Open UI</button>
+                            <button class="btn btn-sm btn-danger" id="settingsComfyDisconnect">Disconnect</button>
+                        </div>
+                    </div>
+
+                    <div class="form-row" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                        <button class="btn btn-sm btn-secondary" id="settingsComfyScanLocal">Scan localhost</button>
+                        <button class="btn btn-sm btn-secondary" id="settingsComfyScanLan" title="Not fully implemented — tries common LAN ports">Scan LAN</button>
+                        <label class="toggle-switch" title="Auto-connect when ComfyUI is found" style="margin-left:8px;">
+                            <input type="checkbox" id="settingsComfyAutoConnect" checked>
+                            <span class="slider"></span>
+                        </label>
+                        <label for="settingsComfyAutoConnect" style="margin:0;">Auto-connect when found</label>
+                    </div>
+
+                    <div class="form-row">
+                        <label for="settingsComfyImageWorkflow">Image workflow</label>
+                        <select id="settingsComfyImageWorkflow" class="form-select">
+                            <option value="sdxl_simple">SDXL Simple</option>
+                            <option value="sdxl_refiner">SDXL + Refiner</option>
+                            <option value="custom">Custom (active workflow in ComfyUI)</option>
+                        </select>
+                        <small class="text-dim" style="display:block; margin-top:4px;">Generate high-quality images using SDXL / local models.</small>
+                    </div>
+
+                    <div class="form-row">
+                        <label for="settingsComfyVideoWorkflow">Video workflow</label>
+                        <select id="settingsComfyVideoWorkflow" class="form-select">
+                            <option value="ltx">LTX-2.3: FLF2V</option>
+                            <option value="ltx_i2v">LTX / image-to-video</option>
+                            <option value="custom">Custom (active workflow in ComfyUI)</option>
+                        </select>
+                        <small class="text-dim" style="display:block; margin-top:4px;">
+                            Upload a starting image to generate a video sequence. The workflow creates a short video with consistent style and motion.
+                        </small>
+                    </div>
+
+                    <button class="btn btn-sm btn-secondary" id="settingsComfyRefreshTemplates" style="margin-bottom:14px;">🔄 Refresh templates, history &amp; models</button>
+
+                    <!-- Models in Workflow -->
+                    <div style="border-top:1px solid rgba(219,184,88,0.2); padding-top:14px; margin-top:4px;">
+                        <div class="panel-title" style="font-size:1rem;"><span class="title-icon">🧩</span> Models in Workflow</div>
+                        <div class="panel-subtitle" style="margin-bottom:12px;">
+                            Dropdowns list models ComfyUI accepts for that node type. <strong>Workflow Default</strong> leaves the graph’s choice untouched (recommended).
+                            Only pick a file when you intentionally override.
+                        </div>
+
+                        <div style="margin-bottom:12px;">
+                            <div style="color:#dbb858; font-weight:600; font-size:0.85rem; margin-bottom:8px;">Image workflow models</div>
+
+                            <div class="form-row">
+                                <label>Load Checkpoint – BASE (CheckpointLoaderSimple · ckpt_name)</label>
+                                <select id="settingsComfyCkptBase" class="form-select">
+                                    <option value="">Workflow Default (sd_xl_base_1.0.safetensors)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-row">
+                                <label>Load Checkpoint – REFINER (CheckpointLoaderSimple · ckpt_name)</label>
+                                <select id="settingsComfyCkptRefiner" class="form-select">
+                                    <option value="">Workflow Default (sd_xl_refiner_1.0.safetensors)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div style="color:#dbb858; font-weight:600; font-size:0.85rem; margin-bottom:8px;">Video workflow models</div>
+
+                            <div class="form-row">
+                                <label>First-Last-Frame to Video (LTX-2.3) / CheckpointLoaderSimple</label>
+                                <select id="settingsComfyVideoCkpt" class="form-select">
+                                    <option value="">Workflow Default (ltx-2.3-22b-distilled-fp8.safetensors)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-row">
+                                <label>LTXAVTextEncoderLoader (ckpt_name)</label>
+                                <select id="settingsComfyVideoTextEnc" class="form-select">
+                                    <option value="">Workflow Default (ltx-2.3-22b-distilled-fp8.safetensors)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-row">
+                                <label>LTXAVTextEncoderLoader (text_encoder)</label>
+                                <select id="settingsComfyVideoTextEnc2" class="form-select">
+                                    <option value="">Workflow Default (gemma_3_12B_it_fp4_mixed.safetensors)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <small class="text-dim" style="display:block; margin-top:8px;">
+                            Custom is best for power users. Templates come from the ComfyUI instance catalog — required models must be installed there.
+                            Optional node titles: __PROMPT__ / __IMAGE_0__
+                        </small>
+                    </div>
                 </div>
 
                 <!-- Notification Sounds -->
@@ -1088,15 +1280,67 @@
 <!-- AI Provider Persistence + Video Source Selector -->
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // ---- Settings AI Provider dropdown ----
-        const providerSelect = document.getElementById('aiProvider');
-        if (providerSelect) {
-            const savedProvider = localStorage.getItem('ai_provider');
-            if (savedProvider) providerSelect.value = savedProvider;
-            providerSelect.addEventListener('change', function() {
-                localStorage.setItem('ai_provider', this.value);
+        // ---- Sprite Prep Generation Source (GPT / Gemini / Grok / ComfyUI) ----
+        const sgSourceSelector = document.getElementById('sgSourceSelector');
+        const sgSourceHint = document.getElementById('sgSourceHint');
+        const sgComfyPanel = document.getElementById('sgComfyPanel');
+        const sgHints = {
+            openai: 'GPT Image 2 — best for chroma-key sprites (requires OpenAI API key in Settings).',
+            gemini: 'Gemini Image — uses your Google API key from Settings.',
+            grok: 'Grok Imagine — uses your xAI / Grok API key from Settings.',
+            comfyui: 'Local ComfyUI — make sure ComfyUI is running (default http://127.0.0.1:8188).'
+        };
+        if (sgSourceSelector) {
+            const saved = localStorage.getItem('sg_source') || 'openai';
+            sgSourceSelector.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.source === saved);
+            });
+            if (sgSourceHint) sgSourceHint.textContent = sgHints[saved] || sgHints.openai;
+            if (sgComfyPanel) sgComfyPanel.style.display = saved === 'comfyui' ? 'block' : 'none';
+
+            sgSourceSelector.addEventListener('click', (e) => {
+                const btn = e.target.closest('.mode-btn');
+                if (!btn) return;
+                sgSourceSelector.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const source = btn.dataset.source;
+                localStorage.setItem('sg_source', source);
+                localStorage.setItem('ai_provider', source);
+                if (sgSourceHint) sgSourceHint.textContent = sgHints[source] || '';
+                if (sgComfyPanel) sgComfyPanel.style.display = source === 'comfyui' ? 'block' : 'none';
             });
         }
+
+        // ComfyUI panel controls
+        const sgComfyUrl = document.getElementById('sgComfyUrl');
+        const sgComfyStatus = document.getElementById('sgComfyStatus');
+        if (sgComfyUrl) {
+            const savedUrl = localStorage.getItem('comfyui_url');
+            if (savedUrl) sgComfyUrl.value = savedUrl;
+            sgComfyUrl.addEventListener('change', () => localStorage.setItem('comfyui_url', sgComfyUrl.value.trim()));
+        }
+        document.getElementById('sgComfyOpen')?.addEventListener('click', () => {
+            const url = (sgComfyUrl?.value || 'http://127.0.0.1:8188').trim();
+            window.open(url, '_blank');
+        });
+        document.getElementById('sgComfyRefresh')?.addEventListener('click', async () => {
+            if (sgComfyStatus) sgComfyStatus.textContent = 'Status: checking...';
+            try {
+                const res = await fetch('/api/comfyui/status');
+                const data = await res.json();
+                if (sgComfyStatus) {
+                    sgComfyStatus.textContent = data.available
+                        ? 'Status: online ✅'
+                        : 'Status: offline ❌ (start ComfyUI first)';
+                    sgComfyStatus.style.color = data.available ? '#6bcb77' : '#e94560';
+                }
+            } catch {
+                if (sgComfyStatus) {
+                    sgComfyStatus.textContent = 'Status: offline ❌';
+                    sgComfyStatus.style.color = '#e94560';
+                }
+            }
+        });
 
         // ---- Generate Video Source Selector ----
         const sourceSelector = document.getElementById('vgSourceSelector');
