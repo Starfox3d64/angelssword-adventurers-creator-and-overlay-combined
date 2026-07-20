@@ -46,6 +46,37 @@
       <!-- Left Column: Connection & Tracking -->
       <div class="column">
 
+      <!-- Quick Actions -->
+      <div class="card" id="overlayQuickActions">
+        <div class="card-header">
+          <h2>⚡ Quick Actions</h2>
+        </div>
+        <div class="card-body">
+          <div class="overlay-action-grid">
+            <button type="button" class="btn btn-secondary" id="qaCopyObs" title="Copy OBS browser source URL">📺 Copy OBS URL</button>
+            <button type="button" class="btn btn-secondary" id="qaOpenObs" title="Open overlay source in new tab">Open OBS Source</button>
+            <button type="button" class="btn btn-secondary" id="qaPingWs" title="Test WebSocket">🔌 Ping WS</button>
+            <button type="button" class="btn btn-secondary" id="qaRefreshAll" title="Reload models & emotes">↻ Refresh Data</button>
+            <button type="button" class="btn btn-secondary" id="qaForceIdle" title="Send idle/neutral state to overlay">😌 Force Idle</button>
+            <button type="button" class="btn btn-secondary" id="qaTestSpeak" title="Pulse speaking state for testing">🗣 Test Speak</button>
+            <button type="button" class="btn btn-secondary" id="qaReleaseEmote" title="Release any active emote">⏹ Release Emote</button>
+            <button type="button" class="btn btn-secondary" id="qaCopyDebug" title="Copy debug overlay URL">🐛 Copy Debug URL</button>
+          </div>
+          <div class="slider-group" style="margin-top:14px;">
+            <label>Threshold Presets</label>
+            <div class="overlay-action-grid">
+              <button type="button" class="btn btn-secondary" data-preset="sensitive">Sensitive</button>
+              <button type="button" class="btn btn-secondary" data-preset="balanced">Balanced</button>
+              <button type="button" class="btn btn-secondary" data-preset="strict">Strict</button>
+              <button type="button" class="btn btn-secondary" data-preset="reset">Reset Default</button>
+            </div>
+          </div>
+          <div id="qaStatus" class="connection-status" style="margin-top:10px;"></div>
+        </div>
+      </div>
+
+
+
         <!-- Connection Card -->
         <div class="card">
           <div class="card-header">
@@ -582,6 +613,125 @@
     probeWs();
     refreshOverlayStatus();
     setInterval(refreshOverlayStatus, 20000);
+  });
+})();
+</script>
+
+
+<script id="overlay-quick-actions">
+(function () {
+  function $(id) { return document.getElementById(id); }
+  function setQa(msg, ok) {
+    const el = $('qaStatus');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.color = ok === false ? '#e94560' : ok ? '#6bcb77' : '#c9a227';
+  }
+
+  const PRESETS = {
+    sensitive: { smile: 12, frown: 12, surprised: 15, eyes: 15 },
+    balanced:  { smile: 20, frown: 20, surprised: 25, eyes: 25 },
+    strict:    { smile: 40, frown: 40, surprised: 45, eyes: 45 },
+    reset:     { smile: 20, frown: 20, surprised: 25, eyes: 25 },
+  };
+
+  function applyPreset(name) {
+    const p = PRESETS[name];
+    if (!p) return;
+    const map = {
+      smile: 'threshold-smile',
+      frown: 'threshold-frown',
+      surprised: 'threshold-surprised',
+      eyes: 'threshold-eyes',
+    };
+    Object.entries(map).forEach(([k, id]) => {
+      const el = $(id);
+      if (!el || p[k] == null) return;
+      el.value = p[k];
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      const val = document.getElementById('val-' + k);
+      if (val) val.textContent = p[k];
+    });
+    // Persist via existing API if control.js posts thresholds
+    fetch('/api/thresholds', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(p)
+    }).catch(() => {});
+    setQa(`Preset applied: ${name}`, true);
+  }
+
+  async function postEmote(path, body) {
+    try {
+      const r = await fetch(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {})
+      });
+      return r.ok;
+    } catch { return false; }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const obsUrl = `${location.origin}/overlay/overlay.html`;
+    const debugUrl = `${location.origin}/overlay/overlay.html?debug=1`;
+
+    $('qaCopyObs')?.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(obsUrl); setQa('OBS URL copied', true); }
+      catch { prompt('OBS URL', obsUrl); }
+    });
+    $('qaOpenObs')?.addEventListener('click', () => window.open(obsUrl, '_blank'));
+    $('qaCopyDebug')?.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(debugUrl); setQa('Debug URL copied', true); }
+      catch { prompt('Debug URL', debugUrl); }
+    });
+    $('qaPingWs')?.addEventListener('click', () => {
+      const url = `ws://${location.hostname}:3001?type=control`;
+      try {
+        const ws = new WebSocket(url);
+        ws.onopen = () => { setQa('WebSocket OK ✅', true); ws.close(); };
+        ws.onerror = () => setQa('WebSocket offline ❌', false);
+        setTimeout(() => { try { ws.close(); } catch(_){} }, 3000);
+      } catch (e) { setQa(String(e.message || e), false); }
+    });
+    $('qaRefreshAll')?.addEventListener('click', () => {
+      if (typeof loadModels === 'function') loadModels();
+      if (typeof loadEmotes === 'function') loadEmotes();
+      setQa('Refresh requested', true);
+      setTimeout(() => location.reload(), 400);
+    });
+    $('qaForceIdle')?.addEventListener('click', async () => {
+      await postEmote('/api/emote/release', {});
+      // Also try WS via control if available
+      setQa('Force Idle sent', true);
+    });
+    $('qaTestSpeak')?.addEventListener('click', async () => {
+      // Pulse speaking via thresholds API as a soft test signal
+      try {
+        await fetch('/api/thresholds', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ testSpeak: true, speaking: true })
+        });
+        setQa('Test Speak pulsed (1.2s)', true);
+        setTimeout(() => {
+          fetch('/api/thresholds', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ speaking: false })
+          }).catch(() => {});
+        }, 1200);
+      } catch { setQa('Test Speak failed', false); }
+    });
+    $('qaReleaseEmote')?.addEventListener('click', async () => {
+      const ok = await postEmote('/api/emote/release', {});
+      setQa(ok ? 'Emote released' : 'Release failed', ok);
+    });
+
+    document.querySelectorAll('[data-preset]').forEach(btn => {
+      btn.addEventListener('click', () => applyPreset(btn.dataset.preset));
+    });
   });
 })();
 </script>
