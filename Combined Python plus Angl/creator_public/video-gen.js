@@ -12,7 +12,7 @@
     // ============================================
     // STATE
     // ============================================
-    let generating = false;
+    let generating = false; window.__asGenerating = false;
     let cancelled = false;
     let referenceImages = []; // Array of { dataUrl, base64 }
     let generatedVideos = [];  // Array of { blob, url }
@@ -135,7 +135,7 @@
             ? (document.getElementById('vgKeyframePrompt')?.value?.trim() || '')
             : (document.getElementById('vgPrompt')?.value?.trim() || '');
 
-        generating = true;
+        generating = true; window.__asGenerating = true;
         cancelled = false;
 
         // Show progress

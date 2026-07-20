@@ -13,40 +13,40 @@
    DESIGN TOKENS
    ============================================ */
 :root {
-    /* Backgrounds */
-    --bg-deep: #1a1a2e;
-    --bg-panel: #16213e;
-    --bg-panel-alt: #1b2a4a;
-    --bg-input: #0f1a30;
-    --bg-card: rgba(22, 33, 62, 0.75);
+    /* Backgrounds — pure black / charcoal gold theme */
+    --bg-deep: #050505;
+    --bg-panel: #0c0c0c;
+    --bg-panel-alt: #121212;
+    --bg-input: #0a0a0a;
+    --bg-card: rgba(12, 12, 12, 0.92);
 
-    /* Accent Colors */
+    /* Accent Colors — refined gold */
     --accent-red: #e94560;
-    --accent-blue: #0f3460;
-    --accent-gold: #dbb858;
-    --accent-gold-soft: #c4a04e;
-    --accent-gold-glow: rgba(219, 184, 88, 0.3);
-    --accent-gold-dim: rgba(219, 184, 88, 0.15);
-    --accent-teal: #5bb5a6;
-    --accent-teal-glow: rgba(91, 181, 166, 0.35);
+    --accent-blue: #1a1a1a;
+    --accent-gold: #d4af37;
+    --accent-gold-soft: #c5a028;
+    --accent-gold-glow: rgba(212, 175, 55, 0.45);
+    --accent-gold-dim: rgba(212, 175, 55, 0.18);
+    --accent-teal: #d4af37;
+    --accent-teal-glow: rgba(212, 175, 55, 0.25);
 
     /* Status Colors */
-    --clr-success: #7b9f6e;
-    --clr-error: #c75050;
-    --clr-info: #5bb5a6;
-    --clr-warning: #dbb858;
+    --clr-success: #6bcb77;
+    --clr-error: #e94560;
+    --clr-info: #d4af37;
+    --clr-warning: #f0d878;
 
     /* Text */
-    --text: #e0e0e0;
-    --text-bright: #fff8ee;
-    --text-muted: #8899aa;
-    --text-dim: #556677;
+    --text: #e8e4d9;
+    --text-bright: #fff8e7;
+    --text-muted: #9a9178;
+    --text-dim: #5c5648;
 
     /* Borders */
-    --border: rgba(255, 255, 255, 0.08);
-    --border-light: rgba(255, 255, 255, 0.12);
-    --border-gold: rgba(219, 184, 88, 0.15);
-    --border-gold-med: rgba(219, 184, 88, 0.25);
+    --border: rgba(212, 175, 55, 0.12);
+    --border-light: rgba(212, 175, 55, 0.22);
+    --border-gold: rgba(212, 175, 55, 0.28);
+    --border-gold-med: rgba(212, 175, 55, 0.4);
 
     /* Typography */
     --font-display: 'Cinzel Decorative', 'Georgia', serif;
@@ -107,9 +107,9 @@ body::before {
     z-index: 0;
     pointer-events: none;
     background:
-        radial-gradient(ellipse at 20% 50%, rgba(219, 184, 88, 0.03) 0%, transparent 60%),
-        radial-gradient(ellipse at 80% 20%, rgba(91, 181, 166, 0.03) 0%, transparent 50%),
-        radial-gradient(ellipse at 50% 80%, rgba(219, 184, 88, 0.02) 0%, transparent 60%);
+        radial-gradient(ellipse at 15% 0%, rgba(212, 175, 55, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 85% 100%, rgba(212, 175, 55, 0.05) 0%, transparent 45%),
+        linear-gradient(180deg, #050505 0%, #0a0a0a 100%);
 }
 
 /* ============================================
@@ -1822,4 +1822,156 @@ input[type="range"]::-moz-range-thumb {
     font-size: 1.5rem;
     color: rgba(219, 184, 88, 0.5);
     pointer-events: none;
+}
+
+
+/* ============================================
+   BLACK & GOLD v1.4 POLISH + QoL
+   ============================================ */
+body {
+    background: #050505 !important;
+}
+
+.app-header {
+    background: linear-gradient(180deg, #0e0e0e 0%, #080808 100%) !important;
+    border-bottom: 1px solid rgba(212, 175, 55, 0.25) !important;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(212, 175, 55, 0.1);
+}
+
+.brand-name {
+    color: #d4af37 !important;
+    text-shadow: 0 0 20px rgba(212, 175, 55, 0.35);
+}
+
+.tab-bar {
+    background: #080808 !important;
+    border-bottom: 1px solid rgba(212, 175, 55, 0.15) !important;
+}
+
+.tab-btn.active {
+    color: #d4af37 !important;
+    border-bottom-color: #d4af37 !important;
+    text-shadow: 0 0 12px rgba(212, 175, 55, 0.4);
+}
+
+.glass-panel {
+    background: rgba(10, 10, 10, 0.95) !important;
+    border: 1px solid rgba(212, 175, 55, 0.18) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(212, 175, 55, 0.06);
+}
+
+.panel-title {
+    color: #d4af37 !important;
+}
+
+.btn-handoff, .btn-primary, .btn-accent {
+    background: linear-gradient(135deg, #d4af37 0%, #b8962e 100%) !important;
+    color: #0a0a0a !important;
+    border: none !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 16px rgba(212, 175, 55, 0.3);
+}
+
+.btn-handoff:hover, .btn-primary:hover, .btn-accent:hover {
+    box-shadow: 0 6px 24px rgba(212, 175, 55, 0.5) !important;
+    filter: brightness(1.08);
+}
+
+.mode-btn.active, .gen-count-btn.active {
+    background: rgba(212, 175, 55, 0.2) !important;
+    border-color: #d4af37 !important;
+    color: #fff8e7 !important;
+}
+
+input, textarea, select, .form-select {
+    background: #0a0a0a !important;
+    border: 1px solid rgba(212, 175, 55, 0.2) !important;
+    color: #e8e4d9 !important;
+}
+
+input:focus, textarea:focus, select:focus {
+    border-color: #d4af37 !important;
+    box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2) !important;
+    outline: none !important;
+}
+
+.upload-zone {
+    border: 2px dashed rgba(212, 175, 55, 0.3) !important;
+    background: rgba(212, 175, 55, 0.03) !important;
+}
+
+.upload-zone:hover, .upload-zone.dragover {
+    border-color: #d4af37 !important;
+    background: rgba(212, 175, 55, 0.08) !important;
+}
+
+#globalStatusBar {
+    background: #000 !important;
+    border-bottom: 1px solid rgba(212, 175, 55, 0.2) !important;
+}
+
+/* Floating QoL: back to top */
+#qolFab {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 9000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#qolFab button {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid rgba(212, 175, 55, 0.4);
+    background: #0c0c0c;
+    color: #d4af37;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    font-size: 1.1rem;
+}
+
+#qolFab button:hover {
+    background: rgba(212, 175, 55, 0.15);
+    box-shadow: 0 0 20px rgba(212, 175, 55, 0.35);
+}
+
+/* Recent characters chips */
+.recent-chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+
+.recent-chips button {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    background: rgba(212, 175, 55, 0.08);
+    color: #d4af37;
+    cursor: pointer;
+}
+
+.recent-chips button:hover {
+    background: rgba(212, 175, 55, 0.2);
+}
+
+kbd {
+    background: #1a1a1a;
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: #d4af37;
+}
+
+.gold-divider {
+    border: none;
+    border-top: 1px solid rgba(212, 175, 55, 0.25);
+    margin: 12px 0;
 }

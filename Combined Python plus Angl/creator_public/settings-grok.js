@@ -598,3 +598,89 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshGlobalStatusBar();
     setInterval(refreshGlobalStatusBar, 30000);
 });
+
+
+
+// ── Extra QoL: FAB, recent characters, beforeunload ────────────────────
+
+function initRecentCharacters() {
+    const input = document.getElementById('sgCharName');
+    const chips = document.getElementById('sgRecentChars');
+    if (!input || !chips) return;
+
+    function load() {
+        try { return JSON.parse(localStorage.getItem('as_recent_chars') || '[]'); }
+        catch { return []; }
+    }
+    function save(list) {
+        localStorage.setItem('as_recent_chars', JSON.stringify(list.slice(0, 8)));
+    }
+    function render() {
+        const list = load();
+        chips.innerHTML = list.map(n =>
+            `<button type="button" data-char="${n.replace(/"/g, '&quot;')}">${n}</button>`
+        ).join('');
+        chips.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                input.value = btn.dataset.char || btn.textContent;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+        });
+    }
+    function remember() {
+        const name = input.value.trim();
+        if (!name) return;
+        const list = load().filter(n => n.toLowerCase() !== name.toLowerCase());
+        list.unshift(name);
+        save(list);
+        render();
+    }
+    input.addEventListener('change', remember);
+    input.addEventListener('blur', remember);
+    // Also remember when generate is clicked
+    document.getElementById('sgGenerateBtn')?.addEventListener('click', () => setTimeout(remember, 0));
+    render();
+}
+
+function initFab() {
+    document.getElementById('qolScrollTop')?.addEventListener('click', () => {
+        const main = document.querySelector('.tab-content') || document.querySelector('.app-container') || window;
+        if (main.scrollTo) main.scrollTo({ top: 0, behavior: 'smooth' });
+        else window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    document.getElementById('qolRefreshStatus')?.addEventListener('click', () => {
+        if (typeof refreshGlobalStatusBar === 'function') refreshGlobalStatusBar();
+        if (typeof showToast === 'function') showToast('Status refreshed', 'info');
+    });
+    document.getElementById('qolCopyStatus')?.addEventListener('click', async () => {
+        try {
+            const health = await (await fetch('/health')).json();
+            const exportSt = await (await fetch('/api/export/status')).json();
+            const text = JSON.stringify({ health, export: exportSt, keys: {
+                openai: !!localStorage.getItem('openai_api_key'),
+                gemini: !!localStorage.getItem('google_api_key'),
+                grok: !!localStorage.getItem('grok_api_key')
+            }}, null, 2);
+            await navigator.clipboard.writeText(text);
+            if (typeof showToast === 'function') showToast('Status copied to clipboard', 'success');
+        } catch (e) {
+            if (typeof showToast === 'function') showToast('Could not copy status', 'error');
+        }
+    });
+}
+
+function initBeforeUnloadGuard() {
+    window.addEventListener('beforeunload', (e) => {
+        // Soft guard if generation flags exist
+        if (window.__asGenerating) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initRecentCharacters();
+    initFab();
+    initBeforeUnloadGuard();
+});

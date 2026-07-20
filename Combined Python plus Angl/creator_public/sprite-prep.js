@@ -30,7 +30,7 @@
     let zoom = parseInt(localStorage.getItem('sp-zoom')) || 100;
 
     // Generative mode state
-    let generating = false;
+    let generating = false; window.__asGenerating = false;
     let genCancelled = false;
     let genResults = [];
     let selectedResult = null;
@@ -396,7 +396,7 @@
         const activeCountBtn = genCountContainer?.querySelector('.gen-count-btn.active');
         const genCount = activeCountBtn ? parseInt(activeCountBtn.dataset.count) : 1;
 
-        generating = true;
+        generating = true; window.__asGenerating = true;
         genCancelled = false;
 
         document.getElementById('sgProgress').classList.add('active');
