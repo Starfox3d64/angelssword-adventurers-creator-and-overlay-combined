@@ -43,7 +43,7 @@ LIVE2D_MODELS = LIVE2D_PUBLIC / "models"
 BIN_DIR = CREATOR_PUBLIC / "bin"
 
 # ── Startup Checks ─────────────────────────────────────────────────────────
-VERSION = "2.1 - Don's Adventurer"
+VERSION = "2.2 - Don's Adventurer"
 LAST_UPDATED = "July 20, 2026"
 
 
@@ -1540,6 +1540,31 @@ def api_music_library():
             "size": f.stat().st_size,
         })
     return jsonify({"tracks": tracks})
+
+
+
+@app.route("/api/music/delete", methods=["POST"])
+def api_music_delete():
+    data = request.get_json(silent=True) or {}
+    name = data.get("name") or data.get("id")
+    if not name:
+        return jsonify({"error": "name required"}), 400
+    MUSIC_LIBRARY.mkdir(parents=True, exist_ok=True)
+    # match by stem or full name
+    target = None
+    for f in MUSIC_LIBRARY.iterdir():
+        if not f.is_file():
+            continue
+        if f.name == name or f.stem == name or f.stem == Path(str(name)).stem:
+            target = f
+            break
+    if not target:
+        return jsonify({"error": "not found"}), 404
+    try:
+        target.unlink()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/music/upload", methods=["POST"])
