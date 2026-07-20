@@ -13,40 +13,38 @@
    DESIGN TOKENS
    ============================================ */
 :root {
-    /* Backgrounds — pure black / charcoal gold theme */
-    --bg-deep: #050505;
-    --bg-panel: #0c0c0c;
-    --bg-panel-alt: #121212;
-    --bg-input: #0a0a0a;
-    --bg-card: rgba(12, 12, 12, 0.92);
+    /* DON character sheet inspired — void black + antique gold + rose */
+    --bg-deep: #030303;
+    --bg-panel: #0a0a0a;
+    --bg-panel-alt: #101010;
+    --bg-input: #070707;
+    --bg-card: rgba(8, 8, 8, 0.96);
 
-    /* Accent Colors — refined gold */
-    --accent-red: #e94560;
-    --accent-blue: #1a1a1a;
-    --accent-gold: #d4af37;
-    --accent-gold-soft: #c5a028;
-    --accent-gold-glow: rgba(212, 175, 55, 0.45);
-    --accent-gold-dim: rgba(212, 175, 55, 0.18);
-    --accent-teal: #d4af37;
-    --accent-teal-glow: rgba(212, 175, 55, 0.25);
+    --accent-red: #8b2942;
+    --accent-blue: #121212;
+    --accent-gold: #c9a227;
+    --accent-gold-soft: #b8860b;
+    --accent-gold-glow: rgba(201, 162, 39, 0.4);
+    --accent-gold-dim: rgba(201, 162, 39, 0.16);
+    --accent-teal: #c9a227;
+    --accent-teal-glow: rgba(201, 162, 39, 0.22);
+    --accent-rose: #6b1c23;
+    --accent-copper: #a67c3d;
 
-    /* Status Colors */
-    --clr-success: #6bcb77;
-    --clr-error: #e94560;
-    --clr-info: #d4af37;
-    --clr-warning: #f0d878;
+    --clr-success: #6b8f5e;
+    --clr-error: #8b2942;
+    --clr-info: #c9a227;
+    --clr-warning: #c9a227;
 
-    /* Text */
-    --text: #e8e4d9;
-    --text-bright: #fff8e7;
-    --text-muted: #9a9178;
-    --text-dim: #5c5648;
+    --text: #e6dcc8;
+    --text-bright: #f5ecd7;
+    --text-muted: #9a8b6a;
+    --text-dim: #5c5340;
 
-    /* Borders */
-    --border: rgba(212, 175, 55, 0.12);
-    --border-light: rgba(212, 175, 55, 0.22);
-    --border-gold: rgba(212, 175, 55, 0.28);
-    --border-gold-med: rgba(212, 175, 55, 0.4);
+    --border: rgba(201, 162, 39, 0.14);
+    --border-light: rgba(201, 162, 39, 0.24);
+    --border-gold: rgba(201, 162, 39, 0.32);
+    --border-gold-med: rgba(201, 162, 39, 0.45);
 
     /* Typography */
     --font-display: 'Cinzel Decorative', 'Georgia', serif;
@@ -107,9 +105,9 @@ body::before {
     z-index: 0;
     pointer-events: none;
     background:
-        radial-gradient(ellipse at 15% 0%, rgba(212, 175, 55, 0.08) 0%, transparent 50%),
-        radial-gradient(ellipse at 85% 100%, rgba(212, 175, 55, 0.05) 0%, transparent 45%),
-        linear-gradient(180deg, #050505 0%, #0a0a0a 100%);
+        radial-gradient(ellipse at 15% 0%, rgba(201, 162, 39, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 85% 100%, rgba(201, 162, 39, 0.05) 0%, transparent 45%),
+        linear-gradient(180deg, #030303 0%, #0a0a0a 100%);
 }
 
 /* ============================================
@@ -1829,85 +1827,85 @@ input[type="range"]::-moz-range-thumb {
    BLACK & GOLD v1.4 POLISH + QoL
    ============================================ */
 body {
-    background: #050505 !important;
+    background: #030303 !important;
 }
 
 .app-header {
-    background: linear-gradient(180deg, #0e0e0e 0%, #080808 100%) !important;
-    border-bottom: 1px solid rgba(212, 175, 55, 0.25) !important;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(212, 175, 55, 0.1);
+    background: linear-gradient(180deg, #0a0a0a 0%, #060606 100%) !important;
+    border-bottom: 1px solid rgba(201, 162, 39, 0.25) !important;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(201, 162, 39, 0.1);
 }
 
 .brand-name {
-    color: #d4af37 !important;
-    text-shadow: 0 0 20px rgba(212, 175, 55, 0.35);
+    color: #c9a227 !important;
+    text-shadow: 0 0 20px rgba(201, 162, 39, 0.35);
 }
 
 .tab-bar {
-    background: #080808 !important;
-    border-bottom: 1px solid rgba(212, 175, 55, 0.15) !important;
+    background: #060606 !important;
+    border-bottom: 1px solid rgba(201, 162, 39, 0.15) !important;
 }
 
 .tab-btn.active {
-    color: #d4af37 !important;
-    border-bottom-color: #d4af37 !important;
-    text-shadow: 0 0 12px rgba(212, 175, 55, 0.4);
+    color: #c9a227 !important;
+    border-bottom-color: #c9a227 !important;
+    text-shadow: 0 0 12px rgba(201, 162, 39, 0.4);
 }
 
 .glass-panel {
     background: rgba(10, 10, 10, 0.95) !important;
-    border: 1px solid rgba(212, 175, 55, 0.18) !important;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(212, 175, 55, 0.06);
+    border: 1px solid rgba(201, 162, 39, 0.18) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(201, 162, 39, 0.06);
 }
 
 .panel-title {
-    color: #d4af37 !important;
+    color: #c9a227 !important;
 }
 
 .btn-handoff, .btn-primary, .btn-accent {
-    background: linear-gradient(135deg, #d4af37 0%, #b8962e 100%) !important;
+    background: linear-gradient(135deg, #c9a227 0%, #b8962e 100%) !important;
     color: #0a0a0a !important;
     border: none !important;
     font-weight: 600 !important;
-    box-shadow: 0 4px 16px rgba(212, 175, 55, 0.3);
+    box-shadow: 0 4px 16px rgba(201, 162, 39, 0.3);
 }
 
 .btn-handoff:hover, .btn-primary:hover, .btn-accent:hover {
-    box-shadow: 0 6px 24px rgba(212, 175, 55, 0.5) !important;
+    box-shadow: 0 6px 24px rgba(201, 162, 39, 0.5) !important;
     filter: brightness(1.08);
 }
 
 .mode-btn.active, .gen-count-btn.active {
-    background: rgba(212, 175, 55, 0.2) !important;
-    border-color: #d4af37 !important;
+    background: rgba(201, 162, 39, 0.2) !important;
+    border-color: #c9a227 !important;
     color: #fff8e7 !important;
 }
 
 input, textarea, select, .form-select {
     background: #0a0a0a !important;
-    border: 1px solid rgba(212, 175, 55, 0.2) !important;
+    border: 1px solid rgba(201, 162, 39, 0.2) !important;
     color: #e8e4d9 !important;
 }
 
 input:focus, textarea:focus, select:focus {
-    border-color: #d4af37 !important;
-    box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2) !important;
+    border-color: #c9a227 !important;
+    box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.2) !important;
     outline: none !important;
 }
 
 .upload-zone {
-    border: 2px dashed rgba(212, 175, 55, 0.3) !important;
-    background: rgba(212, 175, 55, 0.03) !important;
+    border: 2px dashed rgba(201, 162, 39, 0.3) !important;
+    background: rgba(201, 162, 39, 0.03) !important;
 }
 
 .upload-zone:hover, .upload-zone.dragover {
-    border-color: #d4af37 !important;
-    background: rgba(212, 175, 55, 0.08) !important;
+    border-color: #c9a227 !important;
+    background: rgba(201, 162, 39, 0.08) !important;
 }
 
 #globalStatusBar {
     background: #000 !important;
-    border-bottom: 1px solid rgba(212, 175, 55, 0.2) !important;
+    border-bottom: 1px solid rgba(201, 162, 39, 0.2) !important;
 }
 
 /* Floating QoL: back to top */
@@ -1925,17 +1923,17 @@ input:focus, textarea:focus, select:focus {
     width: 44px;
     height: 44px;
     border-radius: 50%;
-    border: 1px solid rgba(212, 175, 55, 0.4);
-    background: #0c0c0c;
-    color: #d4af37;
+    border: 1px solid rgba(201, 162, 39, 0.4);
+    background: #0a0a0a;
+    color: #c9a227;
     cursor: pointer;
     box-shadow: 0 4px 16px rgba(0,0,0,0.5);
     font-size: 1.1rem;
 }
 
 #qolFab button:hover {
-    background: rgba(212, 175, 55, 0.15);
-    box-shadow: 0 0 20px rgba(212, 175, 55, 0.35);
+    background: rgba(201, 162, 39, 0.15);
+    box-shadow: 0 0 20px rgba(201, 162, 39, 0.35);
 }
 
 /* Recent characters chips */
@@ -1950,28 +1948,122 @@ input:focus, textarea:focus, select:focus {
     font-size: 0.75rem;
     padding: 4px 10px;
     border-radius: 999px;
-    border: 1px solid rgba(212, 175, 55, 0.3);
-    background: rgba(212, 175, 55, 0.08);
-    color: #d4af37;
+    border: 1px solid rgba(201, 162, 39, 0.3);
+    background: rgba(201, 162, 39, 0.08);
+    color: #c9a227;
     cursor: pointer;
 }
 
 .recent-chips button:hover {
-    background: rgba(212, 175, 55, 0.2);
+    background: rgba(201, 162, 39, 0.2);
 }
 
 kbd {
     background: #1a1a1a;
-    border: 1px solid rgba(212, 175, 55, 0.35);
+    border: 1px solid rgba(201, 162, 39, 0.35);
     border-radius: 4px;
     padding: 2px 6px;
     font-family: var(--font-mono);
     font-size: 0.8rem;
-    color: #d4af37;
+    color: #c9a227;
 }
 
 .gold-divider {
     border: none;
-    border-top: 1px solid rgba(212, 175, 55, 0.25);
+    border-top: 1px solid rgba(201, 162, 39, 0.25);
     margin: 12px 0;
+}
+
+
+/* ============================================
+   DON SHEET THEME — void black / antique gold / rose
+   ============================================ */
+body {
+    background:
+        radial-gradient(ellipse at 50% 0%, rgba(107, 28, 35, 0.12) 0%, transparent 55%),
+        radial-gradient(ellipse at 80% 100%, rgba(201, 162, 39, 0.06) 0%, transparent 40%),
+        #030303 !important;
+}
+
+.app-header {
+    background: linear-gradient(180deg, #0c0c0c 0%, #050505 100%) !important;
+    border-bottom: 1px solid rgba(201, 162, 39, 0.35) !important;
+    box-shadow: 0 4px 30px rgba(0,0,0,0.8), 0 1px 0 rgba(201, 162, 39, 0.15);
+}
+
+.brand-name, .panel-title {
+    color: #c9a227 !important;
+    text-shadow: 0 0 18px rgba(201, 162, 39, 0.35);
+    letter-spacing: 0.04em;
+}
+
+.tab-btn.active, .step.active {
+    color: #c9a227 !important;
+    border-bottom-color: #c9a227 !important;
+}
+
+.glass-panel {
+    background: linear-gradient(145deg, rgba(12,12,12,0.98), rgba(6,6,6,0.98)) !important;
+    border: 1px solid rgba(201, 162, 39, 0.22) !important;
+    box-shadow:
+        0 8px 40px rgba(0,0,0,0.65),
+        inset 0 1px 0 rgba(201, 162, 39, 0.08);
+}
+
+.btn-handoff, .btn-primary, .btn-accent {
+    background: linear-gradient(135deg, #c9a227 0%, #8a7020 55%, #6b1c23 160%) !important;
+    color: #0a0a0a !important;
+    border: 1px solid rgba(245, 236, 215, 0.15) !important;
+    box-shadow: 0 4px 20px rgba(201, 162, 39, 0.28);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.btn-handoff:hover, .btn-primary:hover, .btn-accent:hover {
+    box-shadow: 0 0 28px rgba(201, 162, 39, 0.45) !important;
+    filter: brightness(1.1);
+}
+
+.mode-btn.active, .gen-count-btn.active {
+    background: rgba(201, 162, 39, 0.18) !important;
+    border-color: #c9a227 !important;
+    color: #f5ecd7 !important;
+    box-shadow: 0 0 12px rgba(201, 162, 39, 0.2);
+}
+
+input, textarea, select, .form-select {
+    background: #070707 !important;
+    border: 1px solid rgba(201, 162, 39, 0.22) !important;
+    color: #e6dcc8 !important;
+}
+
+input:focus, textarea:focus, select:focus {
+    border-color: #c9a227 !important;
+    box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.18) !important;
+}
+
+.upload-zone {
+    border: 2px dashed rgba(201, 162, 39, 0.28) !important;
+    background: rgba(201, 162, 39, 0.03) !important;
+}
+
+.upload-zone:hover {
+    border-color: #c9a227 !important;
+    background: rgba(107, 28, 35, 0.08) !important;
+}
+
+#globalStatusBar {
+    background: #000 !important;
+    border-bottom: 1px solid rgba(201, 162, 39, 0.25) !important;
+    color: #9a8b6a !important;
+}
+
+.gold-divider {
+    border-top: 1px solid rgba(201, 162, 39, 0.3) !important;
+}
+
+/* Ornate scrollbar */
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #c9a227, #6b1c23) !important;
+    border-radius: 4px;
 }
