@@ -4,30 +4,30 @@
    ═══════════════════════════════════════════════════ */
 
 :root {
-  /* Backgrounds — matching AS Adventurer Creator palette */
-  --bg-primary: #1a1a2e;
-  --bg-card: rgba(22, 33, 62, 0.75);
-  --bg-card-hover: #1b2a4a;
-  --bg-input: #0f1a30;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-focus: #dbb858;
+  /* Backgrounds — black & gold */
+  --bg-primary: #050505;
+  --bg-card: rgba(12, 12, 12, 0.95);
+  --bg-card-hover: #141414;
+  --bg-input: #0a0a0a;
+  --border: rgba(212, 175, 55, 0.15);
+  --border-focus: #d4af37;
 
   /* Text */
-  --text-primary: #e0e0e0;
-  --text-secondary: #8899aa;
-  --text-muted: #556677;
+  --text-primary: #e8e4d9;
+  --text-secondary: #9a9178;
+  --text-muted: #5c5648;
 
-  /* Accent — gold from AS Adventurer */
-  --accent: #dbb858;
+  /* Accent — refined gold */
+  --accent: #d4af37;
   --accent-hover: #f0d878;
-  --accent-glow: rgba(219, 184, 88, 0.25);
-  --accent-blue: #0f3460;
-  --accent-teal: #5bb5a6;
+  --accent-glow: rgba(212, 175, 55, 0.35);
+  --accent-blue: #1a1a1a;
+  --accent-teal: #d4af37;
 
   /* Status */
-  --success: #7b9f6e;
-  --warning: #dbb858;
-  --danger: #c75050;
+  --success: #6bcb77;
+  --warning: #f0d878;
+  --danger: #e94560;
 
   /* Expression meters */
   --meter-smile: #7b9f6e;
@@ -785,4 +785,42 @@ input[type="range"]::-webkit-slider-thumb:hover {
   margin-top: 10px;
   padding-top: 8px;
   border-top: 1px solid rgba(250, 204, 21, 0.15);
+}
+
+
+/* BLACK GOLD OVERLAY POLISH */
+body, html {
+  background: #050505 !important;
+}
+.header {
+  border-bottom: 1px solid rgba(212, 175, 55, 0.25) !important;
+}
+.card, .panel, .section {
+  background: rgba(12,12,12,0.95) !important;
+  border: 1px solid rgba(212, 175, 55, 0.18) !important;
+}
+button.primary, .btn-primary, .emote-btn:hover {
+  border-color: #d4af37 !important;
+}
+.overlay-qol-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 10px 0 16px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.15);
+}
+.overlay-qol-bar a, .overlay-qol-bar button {
+  font-size: 0.8rem;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  background: #0c0c0c;
+  color: #d4af37;
+  text-decoration: none;
+  cursor: pointer;
+}
+.overlay-qol-bar a:hover, .overlay-qol-bar button:hover {
+  background: rgba(212, 175, 55, 0.15);
 }
