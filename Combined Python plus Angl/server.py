@@ -38,7 +38,7 @@ CREATOR_PUBLIC = APP_DIR / "creator_public"
 BIN_DIR = CREATOR_PUBLIC / "bin"
 
 # ── Startup Checks ─────────────────────────────────────────────────────────
-VERSION = "1.7 - Combined Edition"
+VERSION = "1.8 - Combined Edition"
 LAST_UPDATED = "July 20, 2026"
 
 
