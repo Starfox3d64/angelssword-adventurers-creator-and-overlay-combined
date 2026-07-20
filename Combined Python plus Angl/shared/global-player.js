@@ -122,6 +122,8 @@
       <span id="asGapTime" class="extra">0:00 / 0:00</span>
       <input type="range" id="asGapScrub" class="extra" min="0" max="1000" value="0" title="Seek" />
       <input type="range" id="asGapVol" min="0" max="1" step="0.01" value="0.8" title="Volume" />
+      <button type="button" id="asGapMute" title="Mute">🔇</button>
+      <a href="/music" id="asGapOpenMusic" title="Open Music Workspace" style="color:#c9a227;text-decoration:none;font-size:12px">Music</a>
       <button type="button" id="asGapHide" title="Minimize">▾</button>
     `;
     document.body.appendChild(bar);
@@ -139,6 +141,11 @@
       savePartial({ time: audio.currentTime });
     };
     $('asGapHide').onclick = () => bar.classList.toggle('collapsed');
+    let _preMute = 0.8;
+    $('asGapMute').onclick = () => {
+      if (audio.volume > 0.01) { _preMute = audio.volume; api.setVolume(0); $('asGapMute').textContent = '🔊'; }
+      else { api.setVolume(_preMute || 0.8); $('asGapMute').textContent = '🔇'; }
+    };
   }
 
   function $(id) { return document.getElementById(id); }
