@@ -407,3 +407,173 @@
 
   refreshLibrary();
 })();
+
+/* ── Music sweep v2.2: bugfixes + QoL ─────────────────────────────── */
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  function toast(msg, ok) {
+    let el = $('musicToast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'musicToast';
+      el.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);z-index:99998;padding:10px 16px;border-radius:10px;background:#0c0c0c;border:1px solid rgba(201,162,39,.45);color:#e6dcc8;font-size:.85rem;max-width:90%;box-shadow:0 8px 24px rgba(0,0,0,.5)';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.style.borderColor = ok === false ? '#e94560' : 'rgba(201,162,39,.45)';
+    el.style.display = 'block';
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.style.display = 'none'; }, 3000);
+  }
+
+  // Delete track from library
+  async function deleteTrack(id, name) {
+    if (!confirm('Delete "' + (name || id) + '" from library?')) return;
+    try {
+      const res = await fetch('/api/music/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, name }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Delete failed');
+      toast('Deleted', true);
+      // refresh if function exists
+      if (typeof refreshLibrary === 'function') await refreshLibrary();
+      else location.reload();
+    } catch (e) {
+      toast(e.message, false);
+    }
+  }
+
+  // Enhance library items with delete + play global buttons after each refresh
+  const _origRefresh = window.refreshLibrary;
+  // Patch list rendering via MutationObserver on libraryList
+  const host = $('libraryList');
+  if (host) {
+    const obs = new MutationObserver(() => {
+      host.querySelectorAll('.lib-item').forEach((el) => {
+        if (el.dataset.enhanced) return;
+        el.dataset.enhanced = '1';
+        const actions = document.createElement('div');
+        actions.style.cssText = 'display:flex;gap:4px;margin-top:4px';
+        const playG = document.createElement('button');
+        playG.className = 'btn sm';
+        playG.textContent = '🌐 BGM';
+        playG.onclick = (e) => {
+          e.stopPropagation();
+          if (window.__ASGlobalAudio) {
+            window.__ASGlobalAudio.setAsGlobalBgm(el.dataset.url, el.dataset.title);
+            toast('Global BGM: ' + el.dataset.title, true);
+          }
+        };
+        const del = document.createElement('button');
+        del.className = 'btn sm';
+        del.textContent = '🗑';
+        del.onclick = (e) => {
+          e.stopPropagation();
+          deleteTrack(el.dataset.id, el.dataset.title);
+        };
+        actions.appendChild(playG);
+        actions.appendChild(del);
+        el.appendChild(actions);
+      });
+    });
+    obs.observe(host, { childList: true });
+  }
+
+  // Cancel generation flag
+  let genAbort = false;
+  function ensureCancelBtn() {
+    const btn = $('btnGenerate');
+    if (!btn || $('btnCancelGen')) return;
+    const cancel = document.createElement('button');
+    cancel.id = 'btnCancelGen';
+    cancel.className = 'btn';
+    cancel.textContent = 'Cancel';
+    cancel.style.marginLeft = '8px';
+    cancel.onclick = () => { genAbort = true; toast('Cancel requested', true); };
+    btn.parentElement?.appendChild(cancel);
+  }
+
+  // Volume preset buttons for local player
+  function ensureVolPresets() {
+    const tab = $('tab-player');
+    if (!tab || $('volPresets')) return;
+    const row = document.createElement('div');
+    row.id = 'volPresets';
+    row.className = 'row';
+    row.innerHTML = '<span class="dim small">Quick volume:</span>';
+    [0.25, 0.5, 0.75, 1].forEach((v) => {
+      const b = document.createElement('button');
+      b.className = 'btn sm';
+      b.textContent = Math.round(v * 100) + '%';
+      b.onclick = () => {
+        const a = $('localPlayer');
+        if (a) a.volume = v;
+        if (window.__ASGlobalAudio) window.__ASGlobalAudio.setVolume(v);
+      };
+      row.appendChild(b);
+    });
+    tab.querySelector('.card')?.appendChild(row);
+  }
+
+  // Shuffle / random BGM from library
+  function ensureShuffle() {
+    const pad = document.querySelector('.panel .pad:last-of-type') || $('libraryList')?.parentElement;
+    if (!pad || $('btnShuffleBgm')) return;
+    const b = document.createElement('button');
+    b.id = 'btnShuffleBgm';
+    b.className = 'btn block';
+    b.style.marginTop = '8px';
+    b.textContent = '🎲 Random Global BGM';
+    b.onclick = async () => {
+      try {
+        const data = await (await fetch('/api/music/library')).json();
+        const list = data.tracks || [];
+        if (!list.length) return toast('Library empty', false);
+        const t = list[Math.floor(Math.random() * list.length)];
+        if (window.__ASGlobalAudio) {
+          window.__ASGlobalAudio.setAsGlobalBgm(t.url, t.title);
+          toast('Now playing: ' + t.title, true);
+        }
+      } catch (e) { toast(e.message, false); }
+    };
+    pad.appendChild(b);
+  }
+
+  // Validate Suno settings before generate
+  const genBtn = $('btnGenerate');
+  if (genBtn) {
+    const prev = genBtn.onclick;
+    genBtn.addEventListener('click', (e) => {
+      const key = localStorage.getItem('suno_api_key') || $('sunoKey')?.value;
+      const base = localStorage.getItem('suno_api_base') || $('sunoBase')?.value;
+      if (!key || !base) {
+        toast('Set Suno API Base URL and Key first', false);
+      }
+    }, true);
+  }
+
+  // Remember last prompt
+  const promptEl = $('genPrompt');
+  if (promptEl) {
+    promptEl.value = localStorage.getItem('suno_last_prompt') || promptEl.value;
+    promptEl.addEventListener('change', () => localStorage.setItem('suno_last_prompt', promptEl.value));
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    ensureCancelBtn();
+    ensureVolPresets();
+    ensureShuffle();
+  });
+  if (document.readyState !== 'loading') {
+    ensureCancelBtn();
+    ensureVolPresets();
+    ensureShuffle();
+  }
+
+  // Expose delete for enhanced items after refreshLibrary runs
+  window.__musicDeleteTrack = deleteTrack;
+})();
