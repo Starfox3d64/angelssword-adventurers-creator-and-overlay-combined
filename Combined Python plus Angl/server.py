@@ -27,10 +27,103 @@ from flask import Flask, send_from_directory, request, jsonify, Response
 APP_DIR = Path(__file__).parent
 OVERLAY_PUBLIC = APP_DIR / "overlay_public"
 CREATOR_PUBLIC = APP_DIR / "creator_public"
+BIN_DIR = CREATOR_PUBLIC / "bin"
 
 # ── Startup Checks ─────────────────────────────────────────────────────────
-VERSION = "1.1 - Combined Edition"
+VERSION = "1.2 - Combined Edition"
 LAST_UPDATED = "July 20, 2026"
+
+
+def get_ffmpeg_path():
+    """Return path to ffmpeg binary, or None if not found."""
+    import shutil
+    import platform
+
+    # 1. Prefer local bin/ folder
+    if platform.system() == "Windows":
+        local = BIN_DIR / "ffmpeg.exe"
+    else:
+        local = BIN_DIR / "ffmpeg"
+    if local.exists():
+        return str(local)
+
+    # 2. Fall back to system PATH
+    system = shutil.which("ffmpeg")
+    if system:
+        return system
+
+    return None
+
+
+def ensure_ffmpeg():
+    """
+    Make sure ffmpeg is available.
+    - Checks bin/ first, then system PATH
+    - If missing, downloads a small static Windows build into bin/
+    Returns the path to ffmpeg or None.
+    """
+    import platform
+    import urllib.request
+    import zipfile
+    import tempfile
+    import shutil
+
+    existing = get_ffmpeg_path()
+    if existing:
+        return existing
+
+    print("[ffmpeg] Not found. Attempting to download a small static build...")
+
+    BIN_DIR.mkdir(exist_ok=True)
+
+    # Only auto-download for Windows (most common for this project)
+    if platform.system() != "Windows":
+        print("[ffmpeg] Auto-download is only supported on Windows.")
+        print("[ffmpeg] Please install ffmpeg and add it to PATH, or place the binary in the bin/ folder.")
+        return None
+
+    # Small essential Windows build (gyan.dev essentials ~40MB, much smaller than full builds)
+    # Using a direct known-good essentials zip
+    url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+    target = BIN_DIR / "ffmpeg.exe"
+
+    try:
+        print(f"[ffmpeg] Downloading from {url}")
+        print("[ffmpeg] This may take a minute (file is ~40-50 MB)...")
+
+        with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
+            tmp_path = Path(tmp.name)
+
+        urllib.request.urlretrieve(url, tmp_path)
+
+        print("[ffmpeg] Extracting ffmpeg.exe ...")
+        with zipfile.ZipFile(tmp_path, "r") as zf:
+            # Find ffmpeg.exe inside the zip (usually under ffmpeg-...-essentials_build/bin/)
+            for name in zf.namelist():
+                if name.endswith("bin/ffmpeg.exe") or name.endswith("ffmpeg.exe"):
+                    with zf.open(name) as src, open(target, "wb") as dst:
+                        shutil.copyfileobj(src, dst)
+                    break
+            else:
+                print("[ffmpeg] Could not find ffmpeg.exe inside the downloaded zip.")
+                tmp_path.unlink(missing_ok=True)
+                return None
+
+        tmp_path.unlink(missing_ok=True)
+
+        if target.exists():
+            size_mb = target.stat().st_size / (1024 * 1024)
+            print(f"[ffmpeg] Successfully installed → {target} ({size_mb:.1f} MB)")
+            return str(target)
+        else:
+            print("[ffmpeg] Download finished but file is missing.")
+            return None
+
+    except Exception as e:
+        print(f"[ffmpeg] Auto-download failed: {e}")
+        print("[ffmpeg] Please download ffmpeg manually and place ffmpeg.exe in the bin/ folder.")
+        print("         Or install ffmpeg and add it to your system PATH.")
+        return None
 
 if not OVERLAY_PUBLIC.exists():
     print(f"[ERROR] overlay_public folder not found at: {OVERLAY_PUBLIC}")
@@ -375,12 +468,27 @@ def creator_files(filename):
 # ── Health ─────────────────────────────────────────────────────────────────
 @app.route("/health")
 def health():
+    ffmpeg = get_ffmpeg_path()
     return {
         "status": "ok",
         "version": VERSION,
         "made_by": "TheDonOfEverything aka Paul Conforti",
         "original": "Leaflit",
-        "angular_improvements": "OOzeClues"
+        "angular_improvements": "OOzeClues",
+        "ffmpeg": {
+            "available": bool(ffmpeg),
+            "path": ffmpeg
+        }
+    }
+
+
+@app.route("/api/ffmpeg/status")
+def ffmpeg_status():
+    path = get_ffmpeg_path()
+    return {
+        "available": bool(path),
+        "path": path,
+        "bin_dir": str(BIN_DIR)
     }
 
 if __name__ == "__main__":
@@ -391,6 +499,16 @@ if __name__ == "__main__":
     print("  Angular improvements by OOzeClues (v0.3.0)")
     print(f"  Version: {VERSION}  |  Last Updated: {LAST_UPDATED}")
     print("═" * 72)
+
+    # Ensure ffmpeg is available (auto-download on Windows if missing)
+    ffmpeg_path = ensure_ffmpeg()
+    if ffmpeg_path:
+        print(f"\n  ffmpeg:          Ready ({ffmpeg_path})")
+    else:
+        print("\n  ffmpeg:          NOT FOUND")
+        print("                   Transparent WebM export will be unavailable until ffmpeg is installed.")
+        print("                   Place ffmpeg.exe in the bin/ folder or add it to PATH.")
+
     print("\n  Landing Page:   http://localhost:3000")
     print("  Overlay:        http://localhost:3000/overlay")
     print("  Creator:        http://localhost:3000/creator")
