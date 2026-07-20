@@ -38,7 +38,7 @@ CREATOR_PUBLIC = APP_DIR / "creator_public"
 BIN_DIR = CREATOR_PUBLIC / "bin"
 
 # ── Startup Checks ─────────────────────────────────────────────────────────
-VERSION = "1.5 - Combined Edition"
+VERSION = "1.6 - Combined Edition"
 LAST_UPDATED = "July 20, 2026"
 
 
@@ -929,16 +929,16 @@ def landing():
         <title>⚔️ AS Adventurer — Combined</title>
         <style>
             :root {
-                --bg-deep: #050505;
-                --bg-panel: #0c0c0c;
-                --accent-gold: #d4af37;
-                --accent-gold-glow: rgba(212, 175, 55, 0.45);
-                --text: #e8e4d9;
-                --text-muted: #9a9178;
+                --bg-deep: #030303;
+                --bg-panel: #0a0a0a;
+                --accent-gold: #c9a227;
+                --accent-gold-glow: rgba(201, 162, 39, 0.4);
+                --text: #e6dcc8;
+                --text-muted: #9a8b6a;
             }
             
             body {
-                background: var(--bg-deep);
+                background: radial-gradient(ellipse at 50% 0%, rgba(107,28,35,0.15) 0%, transparent 50%), #030303;
                 color: var(--text);
                 font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
                 margin: 0;
