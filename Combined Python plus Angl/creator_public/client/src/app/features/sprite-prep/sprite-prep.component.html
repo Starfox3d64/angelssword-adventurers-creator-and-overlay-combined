@@ -1,0 +1,514 @@
+<app-mode-selector [options]="modeOptions" [value]="mode()" (valueChange)="onModeChange($event)" />
+
+@if (mode() === 'manual') {
+  <div class="main-layout">
+    <div>
+      <section class="stage">
+        <div class="stage-header">
+          <span class="stage-number">1</span>
+          <span class="stage-title">Upload Sprite</span>
+        </div>
+        <div class="glass-panel">
+          <div class="form-row">
+            <label>Character Name</label>
+            <input
+              type="text"
+              [ngModel]="characterName"
+              (ngModelChange)="onCharNameChange($event)"
+              placeholder="e.g. Mirrime, Nix, Aniela..."
+              title="Your character's name — used for filenames and AI prompts"
+            />
+          </div>
+          <app-upload-zone
+            accept="image/png,image/jpeg,image/webp"
+            icon="🖼️"
+            text="Drop sprite PNG here or click to browse"
+            hint="Best: 16:9 · ~720p · solid chroma key behind the character"
+            title="Drop a PNG here or click to browse"
+            [forceContent]="!!manualImageSrc()"
+            (filesSelected)="onSpriteFiles($event)"
+            (cleared)="clearSprite()"
+          />
+        </div>
+      </section>
+
+      <section class="stage" [class.disabled]="!manualImageSrc()">
+        <div class="stage-header">
+          <span class="stage-number">2</span>
+          <span class="stage-title">Key Color</span>
+        </div>
+        <div class="glass-panel">
+          <div class="form-row">
+            <label>Key Color <span class="text-dim">(background color for chroma key)</span></label>
+            <app-color-swatches
+              [color]="keyColor()"
+              [badges]="swatchBadges()"
+              (colorChange)="onKeyColorChange($event)"
+              hint="Presets or the themed color picker (HSV / RGB / hex). You can also sample from the frame editor below."
+            />
+            <div class="text-dim mt-1" style="font-size: 0.7rem">
+              Auto-detected on upload. Unused frame area fills with this color. Custom colors persist through Video Gen,
+              Prep, and Export.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      @if (manualImageSrc()) {
+        <section class="stage">
+          <div class="stage-header">
+            <span class="stage-number">3</span>
+            <span class="stage-title">Frame Editor</span>
+          </div>
+          <div class="glass-panel">
+            <div class="panel-subtitle">
+              Drag the image to reposition, use corner handles to rotate, and zoom with the slider. Spill outside the
+              1280×720 frame is clipped. Export captures only the visible frame.
+            </div>
+            <app-sprite-frame-editor
+              #manualEditor
+              [imageSrc]="manualImageSrc()"
+              [keyColor]="keyColor()"
+              (keyColorChange)="onKeyColorChange($event)"
+            />
+          </div>
+        </section>
+      }
+
+      <section class="stage" [class.disabled]="!manualImageSrc()">
+        <div class="stage-header">
+          <span class="stage-number">{{ manualImageSrc() ? '4' : '3' }}</span>
+          <span class="stage-title">Export & Handoff</span>
+        </div>
+        <div class="btn-group">
+          <button type="button" class="btn btn-secondary" [disabled]="!manualImageSrc()" (click)="downloadPNG()">
+            💾 Download PNG
+          </button>
+          <button type="button" class="btn-handoff" [disabled]="!manualImageSrc()" (click)="handoffToVideoGen()">
+            Send to Generate Video →
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <aside class="main-layout-sidebar">
+      <div class="glass-panel">
+        <div class="panel-title"><span class="title-icon">ℹ️</span> About Manual Upload</div>
+        <div class="panel-subtitle">
+          Bring your own character art into the pipeline as a chroma-keyed sprite. The image is placed on a
+          <strong>1280×720</strong> canvas so later video and export steps share one frame size.
+        </div>
+        <div class="panel-subtitle mt-1">
+          <strong class="text-gold">Best source images:</strong>
+        </div>
+        <ul class="panel-subtitle" style="margin: 0.35rem 0 0; padding-left: 1.15rem">
+          <li><strong>16:9 aspect</strong> — matches the pipeline canvas</li>
+          <li><strong>~720p</strong> (1280×720) — sharp enough without huge files</li>
+          <li>
+            <strong>Clear contrasted color</strong> behind the character (green, magenta, etc.) so chroma key can cut
+            cleanly
+          </li>
+          <li>
+            <strong>Headroom and side room</strong> — leave empty space above and beside the figure so advanced emote
+            animations can move without clipping the frame
+          </li>
+        </ul>
+        <div class="panel-subtitle mt-1">
+          <strong class="text-gold">Frame editor:</strong> drag to move, corners to rotate, zoom slider (100% = original
+          size). Empty areas fill with your key color. Download / handoff only save the clipped 1280×720 frame.
+        </div>
+        <div class="panel-subtitle mt-1">
+          <strong class="text-gold">Key color:</strong> on upload we try to auto-pick the background key. Choosing a
+          swatch yourself overrides that pick and
+          <strong>persists through the rest of the workflow</strong> (video gen, prep, and export).
+        </div>
+        <div class="settings-info">
+          <span class="info-icon">💡</span>
+          No API key required for Manual Upload. Prefer AI Generate if you want a model to paint the sprite for you.
+        </div>
+      </div>
+    </aside>
+  </div>
+} @else {
+  <div class="main-layout">
+    <div>
+      <div class="glass-panel">
+        <div class="panel-title"><span class="title-icon">✨</span> Character Details</div>
+        <div class="form-row">
+          <label>Character Name <span class="text-gold">*</span></label>
+          <input
+            type="text"
+            [ngModel]="genCharName"
+            (ngModelChange)="onGenCharNameChange($event)"
+            placeholder="e.g. Mirrime the Mage"
+          />
+        </div>
+        <div class="form-row">
+          <label>Character Action <span class="text-dim">(optional)</span></label>
+          <input type="text" [(ngModel)]="charAction" placeholder="e.g. waving hello" />
+        </div>
+
+        <div class="form-row">
+          <div class="flex items-center gap-sm" style="flex-wrap: wrap">
+            <label class="toggle-switch" title="Skip the built-in sprite prompt (framing, chroma, race) and use your own text after name + action">
+              <input
+                type="checkbox"
+                [checked]="useCustomPrompt()"
+                (change)="onUseCustomPromptToggle($event)"
+              />
+              <span class="slider"></span>
+            </label>
+            <label style="margin-bottom: 0">Custom prompt</label>
+            <span class="text-dim" style="font-size: 0.72rem">
+              for SDXL tags / freeform — still uses name + action
+            </span>
+          </div>
+        </div>
+
+        @if (useCustomPrompt()) {
+          <div class="form-row">
+            <label>Custom prompt text</label>
+            <textarea
+              rows="6"
+              [ngModel]="customPrompt"
+              (ngModelChange)="onCustomPromptChange($event)"
+              placeholder="1girl, blue hair, red cape, masterpiece, best quality, …&#10;(Name + action are prepended automatically; no chroma/framing boilerplate.)"
+              class="custom-prompt-ta"
+            ></textarea>
+            <div class="text-dim mt-1" style="font-size: 0.72rem">
+              Final shape:
+              <code>A single {{ genCharName.trim() || 'Name' }}, {{ charAction.trim() || 'standing in a neutral idle position' }}.</code>
+              then your text below. Description, race mode, and pipeline framing/chroma are not added.
+            </div>
+          </div>
+        } @else {
+          <div class="form-row">
+            <label>Character Description</label>
+            <textarea rows="3" [(ngModel)]="charDesc" placeholder="Blue hair, red cape..."></textarea>
+          </div>
+          <div class="form-row">
+            <label>Race Mode</label>
+            <app-mode-selector [options]="raceOptions" [value]="raceMode()" (valueChange)="raceMode.set($event)" />
+          </div>
+        }
+      </div>
+
+      <div class="glass-panel">
+        <div class="panel-title"><span class="title-icon">🖼️</span> References</div>
+        <div class="two-col">
+          <div class="form-row">
+            <label>Character Reference</label>
+            <app-upload-zone
+              accept="image/*"
+              icon="👤"
+              text="Character Reference"
+              [compact]="true"
+              [forceContent]="!!charRefBase64()"
+              (filesSelected)="onCharRef($event)"
+              (cleared)="clearCharRef()"
+            />
+            @if (charRefBase64()) {
+              <div class="mt-1">
+                <img [src]="charRefBase64()!" style="max-width: 100%; border-radius: var(--radius); border: 1px solid var(--border)" />
+              </div>
+            }
+          </div>
+          <div class="form-row" [class.dimmed-ref]="!styleRefEnabled()">
+            <label>
+              Art Style Reference
+              @if (!styleRefEnabled()) {
+                <span class="text-dim" style="font-weight: 400; font-size: 0.72rem">
+                  (workflow has only one image input)
+                </span>
+              }
+            </label>
+            <app-upload-zone
+              accept="image/*"
+              icon="🎨"
+              text="Style Reference"
+              [compact]="true"
+              [hidden]="!styleRefEnabled()"
+              [forceContent]="!!styleRefBase64() && styleRefEnabled()"
+              (filesSelected)="onStyleRef($event)"
+              (cleared)="clearStyleRef()"
+            />
+            @if (!styleRefEnabled()) {
+              <div class="text-dim mt-1" style="font-size: 0.72rem">
+                This Comfy workflow only has one LoadImage node. Character reference is used;
+                assign it under Local ComfyUI → Image inputs. Pick a two-image workflow for style + character.
+              </div>
+            } @else if (styleRefBase64()) {
+              <div class="mt-1">
+                <img [src]="styleRefBase64()!" style="max-width: 100%; border-radius: var(--radius); border: 1px solid var(--border)" />
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="glass-panel">
+        <div class="panel-title"><span class="title-icon">🎯</span> Generation Settings</div>
+
+        <div class="form-row">
+          <label>Generation Source</label>
+          @if (imageProviderOptions().length) {
+            <app-mode-selector
+              variant="seg"
+              [options]="imageProviderOptions()"
+              [value]="selectedImageProvider()"
+              (valueChange)="onImageProviderChange($event)"
+            />
+            <div class="text-dim mt-1" style="font-size: 0.7rem">{{ imageProviderNote() }}</div>
+          } @else {
+            <div class="api-setup-nudge" role="status">
+              <div class="api-setup-nudge-icon">🔑</div>
+              <div class="api-setup-nudge-body">
+                <div class="api-setup-nudge-title">AI sprite generation needs an API key</div>
+                <p>
+                  Add a key in <strong>Settings</strong> to unlock online image generation. You can
+                  still prepare sprites with <strong>Manual Upload</strong> without any key.
+                </p>
+                <p class="api-setup-nudge-rec">
+                  <strong>Recommended:</strong> {{ recommendedImageProviderLabel }} (OpenAI) — best
+                  default for character sprites in this pipeline.
+                </p>
+                <p class="api-setup-nudge-alt">
+                  Also supported: Gemini Image or Grok Imagine (API key or SuperGrok OAuth).
+                </p>
+                <button type="button" class="btn btn-sm btn-primary" (click)="goToSettings()">
+                  Open Settings
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+
+        @if (imageAspectOptions().length) {
+          <div class="form-row">
+            <label>Aspect Ratio</label>
+            <app-mode-selector
+              variant="seg"
+              [options]="imageAspectOptions()"
+              [value]="imageAspect()"
+              (valueChange)="onImageAspectChange($event)"
+            />
+            <div class="text-dim mt-1" style="font-size: 0.7rem">
+              Default 16:9 matches the pipeline canvas (1280×720).
+            </div>
+          </div>
+        }
+
+        @if (imageSizeOptions().length) {
+          <div class="form-row">
+            <label>Image Size</label>
+            <app-mode-selector
+              variant="seg"
+              [options]="imageSizeOptions()"
+              [value]="imageSize()"
+              (valueChange)="onImageSizeChange($event)"
+            />
+          </div>
+        }
+
+        @if (imageResolutionOptions().length) {
+          <div class="form-row">
+            <label>Resolution</label>
+            <app-mode-selector
+              variant="seg"
+              [options]="imageResolutionOptions()"
+              [value]="imageResolution()"
+              (valueChange)="onImageResolutionChange($event)"
+            />
+          </div>
+        }
+
+        <div class="form-row">
+          <label>Key Color</label>
+          <app-color-swatches
+            [color]="keyColor()"
+            [badges]="swatchBadges()"
+            (colorChange)="onKeyColorChange($event)"
+            hint="Presets or the themed color picker (HSV / RGB / hex). Fine-tune further in the frame editor after you select a result."
+          />
+          <button type="button" class="btn btn-sm btn-secondary mt-1" style="font-size: 0.7rem" (click)="openAdvancedKey()">
+            🔬 Advanced Key Color
+          </button>
+        </div>
+
+        <div class="form-row">
+          <label>Simultaneous Generations</label>
+          <app-gen-count [count]="genCount()" (countChange)="genCount.set($event)" />
+        </div>
+
+        <button
+          type="button"
+          class="btn-handoff mt-2"
+          [disabled]="generating() || !imageProviderOptions().length"
+          (click)="generate()"
+        >
+          ✨ Generate Sprite
+        </button>
+
+        <div class="progress-container" [class.active]="generating()">
+          <div class="progress-bar">
+            <div
+              class="fill"
+              [class.indeterminate]="genProgress() < 0"
+              [style.width.%]="genProgress() < 0 ? 40 : genProgress()"
+            ></div>
+          </div>
+          <div class="progress-text">
+            <span>{{ genStatus()?.type === 'info' ? genStatus()!.text : 'Generating…' }}</span>
+            @if (genProgress() >= 0) {
+              <span class="text-dim" style="margin-left: 0.35rem">{{ genProgress() }}%</span>
+            }
+            <button type="button" class="btn btn-sm btn-danger" (click)="cancelGenerate()">Cancel</button>
+          </div>
+        </div>
+
+        @if (genStatus()) {
+          <div class="status-msg" [class]="genStatus()!.type">{{ genStatus()!.text }}</div>
+        }
+      </div>
+
+      @if (genResults().length) {
+        <div class="glass-panel" #genResultsPanel>
+          <div class="panel-title"><span class="title-icon">🖼️</span> Results</div>
+          <div class="panel-subtitle">Select one option, then refine it in the frame editor below before handoff.</div>
+          <div class="results-grid">
+            @for (url of genResults(); track $index) {
+              <div class="result-card" [class.selected]="selectedResult() === url">
+                <img [src]="url" [alt]="'Generated sprite ' + ($index + 1)" />
+                <div class="card-actions">
+                  <button type="button" class="btn btn-sm btn-secondary" (click)="downloadResult(url, $index)">💾 Save</button>
+                  <button
+                    type="button"
+                    class="btn btn-sm"
+                    [class.btn-primary]="selectedResult() === url"
+                    [class.btn-outline-gold]="selectedResult() !== url"
+                    (click)="selectResult(url)"
+                  >
+                    {{ selectedResult() === url ? '✓ Selected' : 'Select' }}
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      @if (selectedResult()) {
+        <div class="glass-panel">
+          <div class="panel-title"><span class="title-icon">📐</span> Frame Editor</div>
+          <div class="panel-subtitle">
+            Drag to move, corner handles to rotate, zoom slider (100% = original size). Empty frame fills with key color;
+            spill is clipped on export.
+          </div>
+          <app-sprite-frame-editor
+            #genEditor
+            [imageSrc]="selectedResult()"
+            [keyColor]="keyColor()"
+            (keyColorChange)="onKeyColorChange($event)"
+          />
+          <div class="mt-2 btn-group">
+            <button type="button" class="btn btn-secondary" (click)="genHandoffToManual()">🎨 Send to Manual Upload</button>
+            <button type="button" class="btn-handoff" (click)="genHandoffToVideoGen()">Send to Generate Video →</button>
+          </div>
+        </div>
+      }
+    </div>
+
+    <aside class="main-layout-sidebar">
+      @if (usingComfyImage()) {
+        <app-comfy-options-panel kind="image" [activeRoles]="comfyActiveRoles()" />
+      } @else {
+        <div class="glass-panel">
+          <div class="panel-title"><span class="title-icon">ℹ️</span> About AI Generate</div>
+          <div class="panel-subtitle">
+            Describe your character, pick a race mode, and optionally attach references. Online image models return
+            chroma-keyed sprites ready for video animation and export. Generate one or several options, then
+            <strong>Select</strong> a single result to continue the pipeline.
+          </div>
+          <div class="panel-subtitle mt-1">
+            <strong class="text-gold">Why GPT Image 2 is the default:</strong> it stays most coherent with the three race
+            prompts (Normal / Kanolith / Zoalith) and places characters more reliably in frame for VTuber-style
+            sprites—full figure, solid key background, and pose that holds up when you animate later.
+          </div>
+          <div class="panel-subtitle mt-1">
+            After you select a result, use the <strong>frame editor</strong> (drag, rotate, zoom) to fine-tune placement
+            on the pipeline canvas before sending it downstream.
+          </div>
+          <div class="panel-subtitle mt-1">
+            Gemini Image, Grok Imagine, and Local ComfyUI remain available when you prefer those providers.
+            Set keys or SuperGrok login under <strong>Settings</strong>.
+          </div>
+          <div class="settings-info">
+            <span class="info-icon">🎨</span>
+            Prefer your own art? Switch to <strong>Manual Upload</strong> — no API key required.
+          </div>
+        </div>
+      }
+    </aside>
+  </div>
+}
+
+@if (showAdvKey()) {
+  <div class="modal-overlay" (click)="closeAdvancedKey()">
+    <div class="modal-panel glass-panel" style="max-width: 800px; width: 95%" (click)="$event.stopPropagation()">
+      <div class="panel-title">
+        <span class="title-icon">🔬</span> Advanced Key Color Analysis
+        <button type="button" class="btn btn-sm btn-danger" style="float: right; margin-top: -4px" (click)="closeAdvancedKey()">
+          ✕
+        </button>
+      </div>
+      <p class="text-dim" style="font-size: 0.8rem; margin: 0.5rem 0">
+        Draw a rectangle around the <strong>character only</strong> (exclude background), then click <strong>Analyze</strong>.
+      </p>
+      <div
+        style="position: relative; display: inline-block; max-width: 100%; cursor: crosshair; border: 1px solid rgba(219, 184, 88, 0.3); border-radius: 6px; overflow: hidden"
+        (mousedown)="onAdvMouseDown($event)"
+        (mousemove)="onAdvMouseMove($event)"
+        (mouseup)="onAdvMouseUp($event)"
+        (mouseleave)="onAdvMouseUp($event)"
+      >
+        <canvas #advKeyCanvas width="760" height="500"></canvas>
+        <div
+          style="position: absolute; border: 2px dashed #dbb858; background: rgba(219, 184, 88, 0.1); pointer-events: none"
+          [style.display]="advSelectionStyle()['display']"
+          [style.left]="advSelectionStyle()['left']"
+          [style.top]="advSelectionStyle()['top']"
+          [style.width]="advSelectionStyle()['width']"
+          [style.height]="advSelectionStyle()['height']"
+        ></div>
+      </div>
+      <div class="btn-group mt-1">
+        <button type="button" class="btn btn-secondary" (click)="clearAdvSelection()">🗑️ Clear Selection</button>
+        <button type="button" class="btn btn-primary" [disabled]="!advKeyCanAnalyze()" (click)="runAdvAnalysis()">
+          🔍 Analyze Selection
+        </button>
+      </div>
+      @if (advKeyResults().length) {
+        <div class="mt-1">
+          <div class="panel-title" style="font-size: 0.85rem"><span class="title-icon">📊</span> Results — Best Key Color</div>
+          @for (r of advKeyResults(); track r.hex) {
+            <div class="adv-key-result" [class.best]="r.best" (click)="selectAdvColor(r.hex)" style="cursor: pointer">
+              <div class="adv-key-swatch" [style.background]="r.hex"></div>
+              <div class="adv-key-name">{{ r.name }}</div>
+              <div class="adv-key-bar-wrap">
+                <div
+                  class="adv-key-bar"
+                  [style.width.%]="(r.score / maxAdvScore()) * 100"
+                  [style.background]="r.best ? 'var(--accent-gold)' : 'rgba(255,255,255,0.2)'"
+                ></div>
+              </div>
+              <div class="adv-key-score">{{ r.score }}</div>
+              @if (r.best) {
+                <span class="adv-key-badge">BEST</span>
+              }
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </div>
+}
