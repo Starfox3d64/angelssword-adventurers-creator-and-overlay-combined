@@ -5,24 +5,24 @@
 
 :root {
   /* Backgrounds — black & gold */
-  --bg-primary: #050505;
+  --bg-primary: #030303;
   --bg-card: rgba(12, 12, 12, 0.95);
   --bg-card-hover: #141414;
   --bg-input: #0a0a0a;
-  --border: rgba(212, 175, 55, 0.15);
-  --border-focus: #d4af37;
+  --border: rgba(201, 162, 39, 0.15);
+  --border-focus: #c9a227;
 
   /* Text */
-  --text-primary: #e8e4d9;
-  --text-secondary: #9a9178;
+  --text-primary: #e6dcc8;
+  --text-secondary: #9a8b6a;
   --text-muted: #5c5648;
 
   /* Accent — refined gold */
-  --accent: #d4af37;
+  --accent: #c9a227;
   --accent-hover: #f0d878;
-  --accent-glow: rgba(212, 175, 55, 0.35);
+  --accent-glow: rgba(201, 162, 39, 0.35);
   --accent-blue: #1a1a1a;
-  --accent-teal: #d4af37;
+  --accent-teal: #c9a227;
 
   /* Status */
   --success: #6bcb77;
@@ -790,17 +790,17 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 /* BLACK GOLD OVERLAY POLISH */
 body, html {
-  background: #050505 !important;
+  background: #030303 !important;
 }
 .header {
-  border-bottom: 1px solid rgba(212, 175, 55, 0.25) !important;
+  border-bottom: 1px solid rgba(201, 162, 39, 0.25) !important;
 }
 .card, .panel, .section {
   background: rgba(12,12,12,0.95) !important;
-  border: 1px solid rgba(212, 175, 55, 0.18) !important;
+  border: 1px solid rgba(201, 162, 39, 0.18) !important;
 }
 button.primary, .btn-primary, .emote-btn:hover {
-  border-color: #d4af37 !important;
+  border-color: #c9a227 !important;
 }
 .overlay-qol-bar {
   display: flex;
@@ -809,18 +809,37 @@ button.primary, .btn-primary, .emote-btn:hover {
   align-items: center;
   padding: 10px 0 16px;
   margin-bottom: 8px;
-  border-bottom: 1px solid rgba(212, 175, 55, 0.15);
+  border-bottom: 1px solid rgba(201, 162, 39, 0.15);
 }
 .overlay-qol-bar a, .overlay-qol-bar button {
   font-size: 0.8rem;
   padding: 6px 12px;
   border-radius: 8px;
-  border: 1px solid rgba(212, 175, 55, 0.3);
-  background: #0c0c0c;
-  color: #d4af37;
+  border: 1px solid rgba(201, 162, 39, 0.3);
+  background: #0a0a0a;
+  color: #c9a227;
   text-decoration: none;
   cursor: pointer;
 }
 .overlay-qol-bar a:hover, .overlay-qol-bar button:hover {
-  background: rgba(212, 175, 55, 0.15);
+  background: rgba(201, 162, 39, 0.15);
+}
+
+
+/* DON SHEET OVERLAY */
+body, html { background: #030303 !important; }
+.header { border-bottom: 1px solid rgba(201, 162, 39, 0.3) !important; }
+.card, .panel, .section {
+  background: linear-gradient(145deg, #0c0c0c, #060606) !important;
+  border: 1px solid rgba(201, 162, 39, 0.22) !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+.overlay-qol-bar a, .overlay-qol-bar button {
+  border-color: rgba(201, 162, 39, 0.35) !important;
+  color: #c9a227 !important;
+  background: #0a0a0a !important;
+}
+.overlay-qol-bar a:hover, .overlay-qol-bar button:hover {
+  background: rgba(107, 28, 35, 0.25) !important;
+  box-shadow: 0 0 12px rgba(201, 162, 39, 0.25);
 }
