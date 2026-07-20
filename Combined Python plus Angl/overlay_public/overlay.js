@@ -8,7 +8,7 @@
 
   // ── Config ──────────────────────────────────────
   const CONFIG = {
-    wsUrl: `ws://${location.host}?type=overlay`,
+    wsUrl: `ws://${location.hostname}:3001?type=overlay`,
     eyesClosedDelayMs: 1500,   // Must be closed this long to trigger eyes_closed
     reconnectMs: 3000,         // WebSocket reconnect delay
     swapDuration: 200,         // Transition duration in ms (blur-pop or crossfade)

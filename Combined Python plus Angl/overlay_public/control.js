@@ -23,7 +23,7 @@
   const savedSettings = loadSettings();
 
   // ── WebSocket ───────────────────────────────────
-  const wsUrl = `ws://${location.host}?type=control`;
+  const wsUrl = `ws://${location.hostname}:3001?type=control`;
   let ws = null;
 
   function connectWS() {
