@@ -91,8 +91,9 @@
                 return;
             }
         } else if (source === 'grok') {
-            if (!localStorage.getItem('grok_api_key')) {
-                showToast('No Grok API key. Go to Settings to add one.', 'error');
+            const tok = (window.getGrokAuthToken && window.getGrokAuthToken()) || localStorage.getItem('grok_api_key');
+            if (!tok) {
+                showToast('No Grok API key or SuperGrok session. Configure in Settings.', 'error');
                 return;
             }
         } else if (source === 'comfyui') {
@@ -261,7 +262,7 @@
     }
 
     async function generateGrokVideo(prompt, duration) {
-        const apiKey = localStorage.getItem('grok_api_key');
+        const apiKey = (window.getGrokAuthToken && window.getGrokAuthToken()) || localStorage.getItem('grok_api_key');
         const response = await fetch('/api/grok/video/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

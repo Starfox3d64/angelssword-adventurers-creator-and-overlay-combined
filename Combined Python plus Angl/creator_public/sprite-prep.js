@@ -372,8 +372,9 @@
                 return;
             }
         } else if (source === 'grok') {
-            if (!localStorage.getItem('grok_api_key')) {
-                showToast('No Grok API key. Go to Settings to add one.', 'error');
+            const tok = (window.getGrokAuthToken && window.getGrokAuthToken()) || localStorage.getItem('grok_api_key');
+            if (!tok) {
+                showToast('No Grok API key or SuperGrok session. Configure in Settings.', 'error');
                 return;
             }
         } else if (source === 'comfyui') {
@@ -535,9 +536,10 @@
     }
 
     async function generateGrok(prompt, images) {
-        const apiKey = localStorage.getItem('grok_api_key');
-        // xAI image generation (OpenAI-compatible style where available)
-        const response = await fetch('https://api.x.ai/v1/images/generations', {
+        const apiKey = (window.getGrokAuthToken && window.getGrokAuthToken()) || localStorage.getItem('grok_api_key');
+        if (!apiKey) throw new Error('No Grok API key or SuperGrok session');
+        // Prefer local proxy (Angular 0.3.0 compatible)
+        const response = await fetch('/api/xai/images/generations', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

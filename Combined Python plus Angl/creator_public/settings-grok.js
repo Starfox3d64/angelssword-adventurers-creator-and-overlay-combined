@@ -108,23 +108,121 @@ function initGrokSettings() {
         });
     }
 
-    // OAuth stubs
-    document.getElementById('settingsGrokOAuthTest')?.addEventListener('click', () => {
+    // SuperGrok OAuth (device code — Angular 0.3.0 compatible)
+    async function refreshOAuthStatus() {
+        const token = localStorage.getItem('grok_oauth_access_token');
+        const exp = parseInt(localStorage.getItem('grok_oauth_expires_at') || '0', 10);
         if (oauthStatus) {
-            oauthStatus.textContent = 'SuperGrok OAuth is not fully wired in the Python port yet. Use API Key for now.';
-            oauthStatus.className = 'status-msg warning';
+            if (token && Date.now() < exp) {
+                oauthStatus.textContent = 'SuperGrok session: active ✅';
+                oauthStatus.className = 'status-msg success';
+            } else if (token) {
+                oauthStatus.textContent = 'SuperGrok session: token expired — refresh';
+                oauthStatus.className = 'status-msg warning';
+            } else {
+                oauthStatus.textContent = 'SuperGrok session: not connected';
+                oauthStatus.className = 'status-msg info';
+            }
         }
-        if (typeof showToast === 'function') showToast('Use API Key backend for now', 'warning');
-    });
-    document.getElementById('settingsGrokOAuthRefresh')?.addEventListener('click', () => {
-        if (typeof showToast === 'function') showToast('No OAuth token to refresh', 'info');
-    });
-    document.getElementById('settingsGrokOAuthLogout')?.addEventListener('click', () => {
-        localStorage.removeItem('grok_oauth_token');
+    }
+    refreshOAuthStatus();
+
+    document.getElementById('settingsGrokOAuthTest')?.addEventListener('click', async () => {
+        // Start device code flow
         if (oauthStatus) {
-            oauthStatus.textContent = 'SuperGrok session: not connected';
+            oauthStatus.innerHTML = '<span class="spinner"></span> Starting SuperGrok device login...';
             oauthStatus.className = 'status-msg info';
         }
+        try {
+            const res = await fetch('/api/xai/oauth/device', { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+            const userCode = data.user_code || data.userCode;
+            const deviceCode = data.device_code || data.deviceCode;
+            const verifyUrl = data.verification_uri_complete || data.verification_uri || data.verificationUri || 'https://auth.x.ai/activate';
+            const interval = (data.interval || 5) * 1000;
+
+            if (oauthStatus) {
+                oauthStatus.innerHTML = `Open <a href="${verifyUrl}" target="_blank" style="color:#c9a227">auth.x.ai</a> and enter code: <strong>${userCode || '—'}</strong>`;
+                oauthStatus.className = 'status-msg warning';
+            }
+            if (userCode) {
+                try { await navigator.clipboard.writeText(userCode); } catch (_) {}
+                if (typeof showToast === 'function') showToast(`Device code copied: ${userCode}`, 'info');
+            }
+
+            // Poll for token
+            const maxTries = 60;
+            for (let i = 0; i < maxTries; i++) {
+                await new Promise(r => setTimeout(r, interval));
+                const tr = await fetch('/api/xai/oauth/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ grant_type: 'urn:ietf:params:oauth:grant-type:device_code', device_code: deviceCode })
+                });
+                const td = await tr.json().catch(() => ({}));
+                if (tr.ok && (td.access_token || td.accessToken)) {
+                    const access = td.access_token || td.accessToken;
+                    const refresh = td.refresh_token || td.refreshToken || '';
+                    const expiresIn = td.expires_in || td.expiresIn || 3600;
+                    localStorage.setItem('grok_oauth_access_token', access);
+                    if (refresh) localStorage.setItem('grok_oauth_refresh_token', refresh);
+                    localStorage.setItem('grok_oauth_expires_at', String(Date.now() + expiresIn * 1000));
+                    localStorage.setItem('grok_backend', 'oauth');
+                    refreshOAuthStatus();
+                    if (typeof showToast === 'function') showToast('SuperGrok connected!', 'success');
+                    return;
+                }
+                if (td.error && td.error !== 'authorization_pending' && td.error !== 'slow_down') {
+                    throw new Error(td.error_description || td.error);
+                }
+            }
+            throw new Error('Login timed out — try again');
+        } catch (e) {
+            if (oauthStatus) {
+                oauthStatus.textContent = `OAuth failed: ${e.message}`;
+                oauthStatus.className = 'status-msg error';
+            }
+            if (typeof showToast === 'function') showToast(e.message, 'error');
+        }
+    });
+
+    document.getElementById('settingsGrokOAuthRefresh')?.addEventListener('click', async () => {
+        const refresh = localStorage.getItem('grok_oauth_refresh_token');
+        if (!refresh) {
+            if (typeof showToast === 'function') showToast('No refresh token — run Test Connection login', 'warning');
+            return;
+        }
+        try {
+            const tr = await fetch('/api/xai/oauth/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: refresh })
+            });
+            const td = await tr.json();
+            if (!tr.ok) throw new Error(td.error || 'Refresh failed');
+            const access = td.access_token || td.accessToken;
+            const expiresIn = td.expires_in || 3600;
+            if (access) {
+                localStorage.setItem('grok_oauth_access_token', access);
+                localStorage.setItem('grok_oauth_expires_at', String(Date.now() + expiresIn * 1000));
+            }
+            if (td.refresh_token || td.refreshToken) {
+                localStorage.setItem('grok_oauth_refresh_token', td.refresh_token || td.refreshToken);
+            }
+            refreshOAuthStatus();
+            if (typeof showToast === 'function') showToast('Token refreshed', 'success');
+        } catch (e) {
+            if (typeof showToast === 'function') showToast(e.message, 'error');
+        }
+    });
+
+    document.getElementById('settingsGrokOAuthLogout')?.addEventListener('click', () => {
+        localStorage.removeItem('grok_oauth_access_token');
+        localStorage.removeItem('grok_oauth_refresh_token');
+        localStorage.removeItem('grok_oauth_expires_at');
+        refreshOAuthStatus();
         if (typeof showToast === 'function') showToast('Logged out of SuperGrok session', 'info');
     });
 }
@@ -776,3 +874,16 @@ document.addEventListener('DOMContentLoaded', () => {
     initClipboardPasteImage();
     initCopyPromptButtons();
 });
+
+
+/** Return Bearer token for Grok — prefers OAuth when backend is oauth and token valid */
+function getGrokAuthToken() {
+    const backend = localStorage.getItem('grok_backend') || 'api';
+    if (backend === 'oauth') {
+        const access = localStorage.getItem('grok_oauth_access_token');
+        const exp = parseInt(localStorage.getItem('grok_oauth_expires_at') || '0', 10);
+        if (access && Date.now() < exp) return access;
+    }
+    return localStorage.getItem('grok_api_key') || '';
+}
+window.getGrokAuthToken = getGrokAuthToken;
