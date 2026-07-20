@@ -1,71 +1,157 @@
-# ⚔️ AS Adventurer — Combined Edition
+# ⚔️ Don's Adventurer
 
-**Reactive Overlay + VTuber Creator** in one program
+**Overlay · Creator · Live2D Model Suite · Music & Audio** — one local Python app.
 
 **Made by TheDonOfEverything aka Paul Conforti**  
-Original JavaScript version by **Leaflit**  
-Angular improvements (v0.3.0) by **OOzeClues**  
-Python Port • Version 1.3 • July 2026
+Original JavaScript by **Leaflit** · Angular v0.3.0 by **OOzeClues**  
+Python Combined Edition · **v2.2** · 2026
 
-> Everything runs 100% locally on your PC. No Node.js required.
+> Runs 100% on your PC. No Node.js required.
 
-## What’s Inside
+---
 
-| Tool | Features |
-|------|----------|
-| **🎮 Overlay** | Face-tracking control panel, models, emotes, WebSocket relay |
-| **🎨 Creator** | Sprite Prep → AI Video → Video Prep → Transparent Export |
+## What's Inside
 
-## AI Providers
+| Tool | URL | Description |
+|------|-----|-------------|
+| **Main Menu** | http://localhost:3000 | Hub for all suites |
+| **🎮 Overlay** | /overlay | Face tracking, expressions, emotes, WebSocket control |
+| **🎨 Creator** | /creator | Sprite Prep → AI Video → Video Prep → Transparent Export |
+| **🎭 Model & Rigging** | /live2d | Live2D runtime viewer + Creator media (PNG/WebM/GIF) |
+| **🎵 Music & Audio** | /music | Suno generation, library, trim/fade, **global BGM** |
 
-| Feature | Providers |
-|---------|-----------|
-| Sprite generation | OpenAI • Gemini • Grok • Local ComfyUI |
-| Video generation | Gemini Omni Flash • Grok Imagine Video • Local ComfyUI |
-| Export | Offline chroma key + **ffmpeg true-alpha WebM** or browser MediaRecorder |
+---
 
-## Quick Start (Windows)
+## Quick Start
 
+### Windows
 1. Extract the folder  
 2. Double-click **`Start AS Adventurer.bat`**  
 3. Browser opens to the main menu  
 
-## Access Points
+### Linux
+```bash
+chmod +x start-dons-adventurer.sh
+./start-dons-adventurer.sh
+```
 
-| Page | URL |
-|------|-----|
-| Main Menu | http://localhost:3000 |
-| Overlay | http://localhost:3000/overlay |
-| Creator | http://localhost:3000/creator |
-| Health | http://localhost:3000/health |
+### macOS
+- Double-click **`start-dons-adventurer.command`**  
+  (If blocked: right-click → Open, or `chmod +x start-dons-adventurer.command`)  
+- Or in Terminal:
+```bash
+./start-dons-adventurer.command
+```
+
+### Manual
+```bash
+pip install -r requirements.txt   # flask websockets numpy requests
+python server.py                  # or python3 server.py
+```
+
+Open **http://localhost:3000**
+
+---
+
+## AI Providers (Creator)
+
+| Feature | Providers |
+|---------|-----------|
+| Sprite generation | OpenAI · Gemini · Grok / SuperGrok OAuth · Local ComfyUI |
+| Video generation | Gemini Omni Flash · Grok Imagine Video · Local ComfyUI |
+| Export | Offline chroma key + **ffmpeg true-alpha WebM** (or MediaRecorder fallback) |
+
+API keys stay in **browser localStorage**. Proxies run on the local Python server.
+
+---
+
+## Live2D Model Suite
+
+### Supported
+- Runtime packages: **`.model3.json` + `.moc3` + texture PNGs** (+ motions / physics)
+- Zip upload of runtime folders  
+- Creator exports: **PNG, WebM, GIF, MP4** (Media mode)  
+- Parameter sliders, parts opacity, motion play, pose presets  
+- Screenshot, fit/center/zoom, BG color (black / green / magenta / checker)  
+
+### Not supported
+- **`.cmo3` / `.can3`** Cubism Editor projects  
+
+**How to export from Cubism Editor:**  
+`File → Export for Runtime` → put the folder in `live2d_public/models/YourModel/` or import in the UI.
+
+### QoL
+- Load timeout (no silent freeze)  
+- Parameter search filter  
+- Double-click parameter name to reset  
+- Shortcuts: `Space` play motion, `0` center, `+` / `-` zoom  
+- Help button in status bar  
+
+---
+
+## Music & Audio Workspace
+
+- **Suno-compatible API** (set Base URL + API key) — Standard / Custom / BGM modes  
+- Local **MP3/WAV** library (upload, play, delete)  
+- **Trim + fade** with waveform → export WAV to library  
+- **Global BGM**: keeps playing while you use Creator, Overlay, Models, or the menu  
+- Mini-player on every page: play/pause, stop, seek, volume, mute  
+- Random Global BGM, quick volume presets  
+
+Library folder: `music_public/library/`
+
+---
+
+## Overlay
+
+- VTube Studio / iFacialMocap / Webcam sources  
+- Expression thresholds + presets (Sensitive / Balanced / Strict)  
+- Emotes, Quick Actions, session notes, hotkeys  
+- WebSocket control on port **3001**  
+
+Models: `overlay_public/assets/models/YourCharacter/`
+
+---
 
 ## ComfyUI
 
-1. Start ComfyUI (default `http://127.0.0.1:8188`)  
-2. Settings → Local ComfyUI → Connect / Refresh models  
-3. Select **Local ComfyUI** in Sprite Prep or Generate Video  
+1. Start ComfyUI (`http://127.0.0.1:8188`)  
+2. Creator → Settings → Local ComfyUI → Connect / Refresh models  
+3. Choose **Local ComfyUI** as generation source  
+
+---
 
 ## ffmpeg (transparent WebM)
 
-On first run (Windows), the server can auto-download a small essentials build into:
+Auto-download on Windows into `creator_public/bin/`, or place your own binary there.  
+Linux/macOS: install system ffmpeg (`apt install ffmpeg` / `brew install ffmpeg`) or put a binary in `creator_public/bin/`.
+
+---
+
+## Folder Map
 
 ```
-creator_public/bin/ffmpeg.exe
+Don's Adventurer/
+├── server.py
+├── Start AS Adventurer.bat          # Windows
+├── start-dons-adventurer.sh         # Linux
+├── start-dons-adventurer.command    # macOS
+├── requirements.txt
+├── shared/global-player.js          # Persistent BGM mini-player
+├── creator_public/                  # Creator UI
+├── overlay_public/                  # Overlay UI
+├── live2d_public/                   # Model suite
+│   ├── models/                      # Live2D runtime folders
+│   └── media/                       # Creator image/video imports
+└── music_public/
+    └── library/                     # Audio library
 ```
 
-Or place your own binary there. Export uses ffmpeg when available (true alpha); otherwise falls back to MediaRecorder.
-
-## Overlay Models
-
-Put character folders in:
-
-```
-overlay_public/assets/models/YourCharacter/
-```
+---
 
 ## Credits
 
-- **TheDonOfEverything aka Paul Conforti** — Python Combined Edition  
+- **TheDonOfEverything aka Paul Conforti** — Python Combined Edition, Live2D suite, Music suite, global audio  
 - **Leaflit** — Original JavaScript version  
 - **OOzeClues** — Angular improvements (v0.3.0)  
 
