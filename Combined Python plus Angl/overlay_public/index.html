@@ -21,11 +21,26 @@
           <div class="brand-tagline">Reactive Overlay · Angel's Sword Studios</div>
         </div>
       </div>
-      <div class="header-status">
+      <div class="header-status" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
         <span class="status-dot" id="ws-status"></span>
         <span id="ws-status-text">Connecting...</span>
+        <span id="overlayClock" class="overlay-clock">--:--</span>
       </div>
     </header>
+
+    <!-- Overlay Status Bar -->
+    <div id="overlayStatusBar" class="overlay-status-bar">
+      <span id="ovStatWs">WS: …</span>
+      <span class="ov-sep">•</span>
+      <span id="ovStatModel">Model: —</span>
+      <span class="ov-sep">•</span>
+      <span id="ovStatSource">Source: —</span>
+      <span class="ov-sep">•</span>
+      <span id="ovStatEmotes">Emotes: —</span>
+      <button type="button" id="ovBtnNotes" class="ov-chip-btn">📌 Notes</button>
+      <button type="button" id="ovBtnHelp" class="ov-chip-btn">⌨️ Hotkeys</button>
+      <span id="ovStatVersion" class="ov-version">Overlay</span>
+    </div>
 
     <div class="main-grid">
       <!-- Left Column: Connection & Tracking -->
@@ -256,7 +271,19 @@
           </div>
         </div>
 
-        <!-- Model Selector Card -->
+        
+  <div class="overlay-qol-bar">
+    <a href="/creator">🎨 Creator</a>
+    <a href="/">🏠 Menu</a>
+    <a href="/overlay/overlay.html" target="_blank" title="Open the transparent browser source for OBS">📺 OBS Source</a>
+    <button type="button" id="overlayCopyWs" title="Copy WebSocket URL">Copy WS URL</button>
+    <button type="button" id="overlayCopyObs" title="Copy OBS browser source URL">Copy OBS URL</button>
+    <button type="button" id="overlayRefreshModels">↻ Models</button>
+    <button type="button" id="overlayRefreshAll">↻ Full Refresh</button>
+    <button type="button" id="overlayMuteSfxToggle" title="Toggle SFX mute quickly">🔊 SFX</button>
+    <span id="overlayWsBadge" class="ov-badge">WS: …</span>
+  </div>
+<!-- Model Selector Card -->
         <div class="card">
           <div class="card-header">
             <h2>🎭 Model Selector</h2>
@@ -351,6 +378,213 @@
     </div>
   </div>
 
-  <script src="control.js"></script>
+  
+  <!-- Overlay Session Notes -->
+  <div id="overlayNotesPanel" class="overlay-notes-panel hidden">
+    <div class="overlay-notes-header">
+      <strong>📌 Overlay Notes</strong>
+      <button type="button" id="overlayNotesClose">✕</button>
+    </div>
+    <textarea id="overlayNotesBody" rows="10" placeholder="Stream checklist, emote cues, guest notes..."></textarea>
+    <div class="overlay-notes-footer">Auto-saved in this browser</div>
+  </div>
+
+  <!-- Overlay Hotkeys Modal -->
+  <div id="overlayHotkeysModal" class="overlay-modal hidden">
+    <div class="overlay-modal-card">
+      <div class="overlay-notes-header">
+        <strong>⌨️ Overlay Hotkeys</strong>
+        <button type="button" id="overlayHotkeysClose">✕</button>
+      </div>
+      <div class="overlay-hotkey-grid">
+        <kbd>1</kbd><span>Focus Models</span>
+        <kbd>2</kbd><span>Focus Emotes</span>
+        <kbd>R</kbd><span>Refresh models</span>
+        <kbd>N</kbd><span>Toggle notes</span>
+        <kbd>?</kbd><span>Show hotkeys</span>
+        <kbd>Esc</kbd><span>Close panels</span>
+        <kbd>Ctrl</kbd>+<kbd>C</kbd><span>Copy OBS URL (when not typing)</span>
+      </div>
+      <p class="help-text" style="margin-top:12px;">Tip: Open <code>/overlay/overlay.html</code> as a Browser Source in OBS (transparent background).</p>
+    </div>
+  </div>
+
+  <!-- Floating actions -->
+  <div id="overlayFab" class="overlay-fab">
+    <button type="button" id="fabNotes" title="Notes">📌</button>
+    <button type="button" id="fabCopyObs" title="Copy OBS URL">📺</button>
+    <button type="button" id="fabTop" title="Scroll top">↑</button>
+  </div>
+
+<script src="control.js"></script>
+
+
+
+
+<script id="overlay-qol-init">
+(function () {
+  const WS_URL = `ws://${location.hostname}:3001?type=control`;
+  const OBS_URL = `${location.origin}/overlay/overlay.html`;
+
+  function $(id) { return document.getElementById(id); }
+
+  function setBadge(text, ok) {
+    const el = $('overlayWsBadge');
+    const st = $('ovStatWs');
+    if (el) {
+      el.textContent = text;
+      el.style.color = ok ? '#6bcb77' : '#9a8b6a';
+    }
+    if (st) {
+      st.textContent = text;
+      st.style.color = ok ? '#6bcb77' : '#9a8b6a';
+    }
+  }
+
+  function tickClock() {
+    const el = $('overlayClock');
+    if (!el) return;
+    el.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  async function refreshOverlayStatus() {
+    try {
+      const [modelsRes, emotesRes, healthRes] = await Promise.all([
+        fetch('/api/models').then(r => r.json()).catch(() => null),
+        fetch('/api/emotes').then(r => r.json()).catch(() => []),
+        fetch('/health').then(r => r.json()).catch(() => null),
+      ]);
+      if (modelsRes) {
+        const active = modelsRes.active || '—';
+        const count = (modelsRes.models || []).length;
+        const m = $('ovStatModel');
+        if (m) m.textContent = `Model: ${active} (${count})`;
+      }
+      const em = $('ovStatEmotes');
+      if (em) em.textContent = `Emotes: ${Array.isArray(emotesRes) ? emotesRes.length : 0}`;
+
+      const srcTab = document.querySelector('.source-tab.active');
+      const src = $('ovStatSource');
+      if (src) src.textContent = `Source: ${srcTab ? srcTab.textContent.trim() : '—'}`;
+
+      const ver = $('ovStatVersion');
+      if (ver && healthRes?.version) ver.textContent = healthRes.version;
+    } catch (_) {}
+  }
+
+  function initNotes() {
+    const panel = $('overlayNotesPanel');
+    const body = $('overlayNotesBody');
+    if (!panel || !body) return;
+    body.value = localStorage.getItem('as_overlay_notes') || '';
+    body.addEventListener('input', () => localStorage.setItem('as_overlay_notes', body.value));
+    const toggle = () => panel.classList.toggle('hidden');
+    $('ovBtnNotes')?.addEventListener('click', toggle);
+    $('fabNotes')?.addEventListener('click', toggle);
+    $('overlayNotesClose')?.addEventListener('click', () => panel.classList.add('hidden'));
+  }
+
+  function initHotkeysModal() {
+    const modal = $('overlayHotkeysModal');
+    if (!modal) return;
+    const open = () => modal.classList.remove('hidden');
+    const close = () => modal.classList.add('hidden');
+    $('ovBtnHelp')?.addEventListener('click', open);
+    $('overlayHotkeysClose')?.addEventListener('click', close);
+    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+  }
+
+  async function copyText(text, label) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setBadge(label || 'Copied', true);
+    } catch {
+      prompt('Copy:', text);
+    }
+  }
+
+  function initButtons() {
+    $('overlayCopyWs')?.addEventListener('click', () => copyText(WS_URL, 'WS URL copied'));
+    $('overlayCopyObs')?.addEventListener('click', () => copyText(OBS_URL, 'OBS URL copied'));
+    $('fabCopyObs')?.addEventListener('click', () => copyText(OBS_URL, 'OBS URL copied'));
+    $('overlayRefreshModels')?.addEventListener('click', () => {
+      if (typeof loadModels === 'function') loadModels();
+      refreshOverlayStatus();
+    });
+    $('overlayRefreshAll')?.addEventListener('click', () => location.reload());
+    $('fabTop')?.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+
+    $('overlayMuteSfxToggle')?.addEventListener('click', () => {
+      // Try common mute controls if present
+      const muteBtn = document.getElementById('btn-sfx-mute') || document.getElementById('sfx-mute');
+      if (muteBtn) muteBtn.click();
+      else {
+        const pressed = localStorage.getItem('as_overlay_sfx_muted') === '1';
+        localStorage.setItem('as_overlay_sfx_muted', pressed ? '0' : '1');
+        $('overlayMuteSfxToggle').textContent = pressed ? '🔊 SFX' : '🔇 SFX';
+      }
+    });
+
+    // Track source tab changes for status
+    document.querySelectorAll('.source-tab').forEach(tab => {
+      tab.addEventListener('click', () => setTimeout(refreshOverlayStatus, 50));
+    });
+  }
+
+  function initKeyboard() {
+    document.addEventListener('keydown', (e) => {
+      const tag = (e.target && e.target.tagName) || '';
+      const typing = tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable;
+      if (e.key === 'Escape') {
+        $('overlayNotesPanel')?.classList.add('hidden');
+        $('overlayHotkeysModal')?.classList.add('hidden');
+        return;
+      }
+      if (typing) return;
+      if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+        e.preventDefault();
+        $('overlayHotkeysModal')?.classList.toggle('hidden');
+      } else if (e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        $('overlayNotesPanel')?.classList.toggle('hidden');
+      } else if (e.key.toLowerCase() === 'r') {
+        e.preventDefault();
+        if (typeof loadModels === 'function') loadModels();
+        refreshOverlayStatus();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        // only if no selection
+        if (!String(window.getSelection() || '')) {
+          e.preventDefault();
+          copyText(OBS_URL, 'OBS URL copied');
+        }
+      }
+    });
+  }
+
+  function probeWs() {
+    try {
+      const probe = new WebSocket(WS_URL);
+      probe.onopen = () => { setBadge('WS: connected', true); probe.close(); };
+      probe.onerror = () => setBadge('WS: offline', false);
+      setTimeout(() => { try { probe.close(); } catch (_) {} }, 3000);
+    } catch {
+      setBadge('WS: offline', false);
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    tickClock();
+    setInterval(tickClock, 15000);
+    initNotes();
+    initHotkeysModal();
+    initButtons();
+    initKeyboard();
+    probeWs();
+    refreshOverlayStatus();
+    setInterval(refreshOverlayStatus, 20000);
+  });
+})();
+</script>
+
 </body>
 </html>
