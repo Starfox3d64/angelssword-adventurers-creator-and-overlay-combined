@@ -447,6 +447,86 @@
                             </small>
                         </div>
 
+                        <!-- Local ComfyUI Panel for Video (shown when ComfyUI source selected) -->
+                        <div id="vgComfyPanel" class="glass-panel" style="display:none; margin-bottom:16px; border:1px solid rgba(219,184,88,0.25);">
+                            <div class="panel-title"><span class="title-icon">🖥️</span> Local ComfyUI</div>
+                            <div id="vgComfyStatus" class="status-msg info" style="margin-bottom:8px;">Status: unknown</div>
+
+                            <div class="form-row">
+                                <label for="vgComfyUrl">ComfyUI URL</label>
+                                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                                    <input type="text" id="vgComfyUrl" value="http://127.0.0.1:8188" style="flex:1; min-width:200px;">
+                                    <button class="btn btn-sm btn-secondary" id="vgComfyOpen">Open ComfyUI</button>
+                                    <button class="btn btn-sm btn-secondary" id="vgComfyRefresh">Refresh</button>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <label for="vgComfyWorkflow">Video workflow</label>
+                                <select id="vgComfyWorkflow" class="form-select">
+                                    <option value="ltx_flf2v">LTX-2.3: FLF2V</option>
+                                    <option value="ltx_i2v">LTX / image-to-video</option>
+                                    <option value="custom">Custom (active workflow in ComfyUI)</option>
+                                </select>
+                                <small class="text-dim" style="display:block; margin-top:4px;">
+                                    Upload a starting image to generate a video sequence with consistent style and motion.
+                                </small>
+                            </div>
+
+                            <div class="form-row" style="display:flex; align-items:center; gap:10px;">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="vgComfyUnload">
+                                    <span class="slider"></span>
+                                </label>
+                                <label for="vgComfyUnload" style="margin:0;">Unload models before run</label>
+                            </div>
+
+                            <div style="margin-top:10px;">
+                                <div style="color:#dbb858; font-weight:600; font-size:0.85rem; margin-bottom:8px;">MODELS</div>
+                                <div class="form-row">
+                                    <label>CheckpointLoaderSimple (ckpt_name)</label>
+                                    <select id="vgComfyCkpt" class="form-select">
+                                        <option value="">Workflow Default (ltx-2.3-22b-distilled-fp8.safetensors)</option>
+                                    </select>
+                                </div>
+                                <div class="form-row">
+                                    <label>LTXAVTextEncoderLoader (ckpt_name)</label>
+                                    <select id="vgComfyTextEnc" class="form-select">
+                                        <option value="">Workflow Default</option>
+                                    </select>
+                                </div>
+                                <div class="form-row">
+                                    <label>Text encoder / VAE</label>
+                                    <select id="vgComfyVae" class="form-select">
+                                        <option value="">Workflow Default</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div style="margin-top:10px;">
+                                <div style="color:#dbb858; font-weight:600; font-size:0.85rem; margin-bottom:8px;">IMAGE INPUTS</div>
+                                <div class="form-row">
+                                    <label>Reference image</label>
+                                    <select id="vgComfyRefAssign" class="form-select">
+                                        <option value="auto">Auto — use uploaded reference</option>
+                                        <option value="none">None — not used</option>
+                                    </select>
+                                </div>
+                                <div class="form-row">
+                                    <label>Keyframe start</label>
+                                    <select id="vgComfyKeyStart" class="form-select">
+                                        <option value="first">Load First Frame · #1</option>
+                                    </select>
+                                </div>
+                                <div class="form-row">
+                                    <label>Keyframe end</label>
+                                    <select id="vgComfyKeyEnd" class="form-select">
+                                        <option value="last">Load Last Frame · #2</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="mode-selector" id="vgModeSelector">
                             <button class="mode-btn active" data-mode="reference" title="Provide reference images and describe the animation">🖼️ Reference Mode</button>
                             <button class="mode-btn" data-mode="keyframe" title="Upload start and end frames — AI interpolates between them">🔑 Keyframe Mode</button>
@@ -1342,34 +1422,103 @@
             }
         });
 
-        // ---- Generate Video Source Selector ----
+        // ---- Generate Video Source Selector + ComfyUI Panel ----
         const sourceSelector = document.getElementById('vgSourceSelector');
         const sourceHint = document.getElementById('vgSourceHint');
-        if (sourceSelector) {
-            const hints = {
-                gemini: 'Gemini Omni Flash — best quality video generation (requires Google API key).',
-                grok: 'Grok Imagine Video — uses your xAI / Grok API key from Settings.',
-                comfyui: 'Local ComfyUI — make sure ComfyUI is running on http://127.0.0.1:8188'
-            };
+        const vgComfyPanel = document.getElementById('vgComfyPanel');
+        const hints = {
+            gemini: 'Gemini Omni Flash — best quality video generation (requires Google API key).',
+            grok: 'Grok Imagine Video — uses your xAI / Grok API key from Settings.',
+            comfyui: 'Local ComfyUI — configure workflow and models in the panel below.'
+        };
 
-            // Restore saved source
+        function setVgSource(source) {
+            if (sourceSelector) {
+                sourceSelector.querySelectorAll('.mode-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.source === source);
+                });
+            }
+            if (sourceHint) sourceHint.textContent = hints[source] || '';
+            if (vgComfyPanel) vgComfyPanel.style.display = source === 'comfyui' ? 'block' : 'none';
+            localStorage.setItem('vg_source', source);
+        }
+
+        if (sourceSelector) {
             const savedSource = localStorage.getItem('vg_source') || 'gemini';
-            sourceSelector.querySelectorAll('.mode-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.source === savedSource);
-            });
-            if (sourceHint) sourceHint.textContent = hints[savedSource] || hints.gemini;
+            setVgSource(savedSource);
 
             sourceSelector.addEventListener('click', function(e) {
                 const btn = e.target.closest('.mode-btn');
                 if (!btn) return;
-                sourceSelector.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                const source = btn.dataset.source;
-                localStorage.setItem('vg_source', source);
-                if (sourceHint) sourceHint.textContent = hints[source] || '';
-                console.log('[AS Adventurer] Video generation source:', source);
+                setVgSource(btn.dataset.source);
+                console.log('[AS Adventurer] Video generation source:', btn.dataset.source);
             });
         }
+
+        // ComfyUI panel controls in Generate Video
+        const vgComfyUrl = document.getElementById('vgComfyUrl');
+        const vgComfyStatus = document.getElementById('vgComfyStatus');
+        if (vgComfyUrl) {
+            const saved = localStorage.getItem('comfyui_url');
+            if (saved) vgComfyUrl.value = saved;
+            vgComfyUrl.addEventListener('change', () => localStorage.setItem('comfyui_url', vgComfyUrl.value.trim()));
+        }
+        document.getElementById('vgComfyOpen')?.addEventListener('click', () => {
+            window.open((vgComfyUrl?.value || 'http://127.0.0.1:8188').trim(), '_blank');
+        });
+        document.getElementById('vgComfyRefresh')?.addEventListener('click', async () => {
+            if (vgComfyStatus) vgComfyStatus.textContent = 'Status: checking...';
+            try {
+                const res = await fetch('/api/comfyui/status');
+                const data = await res.json();
+                if (vgComfyStatus) {
+                    vgComfyStatus.textContent = data.available ? 'Status: online ✅' : 'Status: offline ❌';
+                    vgComfyStatus.className = data.available ? 'status-msg success' : 'status-msg error';
+                }
+                if (data.available) {
+                    // Try load checkpoints into dropdowns
+                    try {
+                        const infoRes = await fetch('/api/comfyui/object_info');
+                        if (infoRes.ok) {
+                            const info = await infoRes.json();
+                            const ckpts = info?.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0] || [];
+                            ['vgComfyCkpt', 'vgComfyTextEnc', 'vgComfyVae'].forEach(id => {
+                                const el = document.getElementById(id);
+                                if (!el || !ckpts.length) return;
+                                const first = el.options[0];
+                                el.innerHTML = '';
+                                if (first) el.appendChild(first);
+                                ckpts.forEach(name => {
+                                    const opt = document.createElement('option');
+                                    opt.value = name;
+                                    opt.textContent = name;
+                                    el.appendChild(opt);
+                                });
+                            });
+                        }
+                    } catch (_) {}
+                }
+            } catch {
+                if (vgComfyStatus) {
+                    vgComfyStatus.textContent = 'Status: offline ❌';
+                    vgComfyStatus.className = 'status-msg error';
+                }
+            }
+        });
+        // Persist workflow / unload prefs
+        ['vgComfyWorkflow', 'vgComfyUnload', 'vgComfyCkpt', 'vgComfyTextEnc', 'vgComfyVae'].forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const key = 'vg_' + id;
+            const saved = localStorage.getItem(key);
+            if (saved !== null) {
+                if (el.type === 'checkbox') el.checked = saved === 'true';
+                else el.value = saved;
+            }
+            el.addEventListener('change', () => {
+                localStorage.setItem(key, el.type === 'checkbox' ? el.checked : el.value);
+            });
+        });
     });
 </script>
 
