@@ -843,3 +843,26 @@ body, html { background: #030303 !important; }
   background: rgba(107, 28, 35, 0.25) !important;
   box-shadow: 0 0 12px rgba(201, 162, 39, 0.25);
 }
+
+
+/* VISIBILITY FIX OVERLAY */
+input[type="range"] {
+  -webkit-appearance: none;
+  height: 8px;
+  background: #1a0a0c;
+  border: 1px solid rgba(201,162,39,0.4);
+  border-radius: 6px;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #c9a227, #8b2942);
+  border: 2px solid #f5ecd7;
+}
+.meter, .meter-fill, .bar-fill {
+  background: linear-gradient(90deg, #8b2942, #c9a227) !important;
+}
+.btn, button {
+  border-color: rgba(201,162,39,0.4);
+}
