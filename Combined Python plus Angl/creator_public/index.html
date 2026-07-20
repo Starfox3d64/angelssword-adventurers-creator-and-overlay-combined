@@ -60,7 +60,9 @@
         <span id="statusComfy" title="Local ComfyUI">ComfyUI: …</span>
         <span>•</span>
         <span id="statusKeys" title="Configured API keys">Keys: …</span>
-        <span style="margin-left:auto; color:#556677;" id="statusVersion">AS Adventurer</span>
+        <button type="button" id="btnStickyNotes" class="btn btn-sm btn-secondary" style="margin-left:auto;font-size:0.7rem;">📌 Notes</button>
+        <span id="statusClock" style="color:#c9a227;font-variant-numeric:tabular-nums;">--:--</span>
+        <span style="color:#5c5340;" id="statusVersion">AS Adventurer</span>
     </div>
 
     <!-- ═══════════════════════════════════════
@@ -118,9 +120,11 @@
                                     <label for="spCharName">Character Name</label>
                                     <input type="text" id="spCharName" placeholder="e.g. Mirrime, Nix, Aniela..." title="Your character's name — used for filenames and AI prompts">
                                 </div>
+                            <div class="recent-chips" id="sgRecentChars" title="Recently used character names"></div>
+
                                 <div class="upload-zone" id="spUploadZone" title="Drop a PNG here or click to browse">
                                     <div class="upload-icon">🖼️</div>
-                                    <div class="upload-text">Drop sprite PNG here or click to browse</div>
+                                    <div class="upload-text">Drop sprite PNG here, click to browse, or Ctrl+V paste</div>
                                     <div class="upload-hint">Any resolution — will be placed on 1280×720 canvas</div>
                                     <input type="file" id="spFileInput" accept="image/png,image/jpeg,image/webp">
                                 </div>
@@ -1417,6 +1421,23 @@
         </div>
         <p class="text-dim" style="margin-top:14px; font-size:0.8rem;">Shortcuts are ignored while typing in inputs or textareas.</p>
     </div>
+</div>
+
+<!-- Sticky Notes -->
+<div id="stickyNotesPanel" class="glass-panel hidden" style="position:fixed; right:20px; bottom:80px; width:300px; z-index:9500; padding:14px;">
+    <div class="panel-title" style="font-size:0.95rem;">
+        📌 Session Notes
+        <button type="button" id="stickyNotesClose" class="btn btn-sm btn-danger" style="float:right;margin-top:-4px;">✕</button>
+    </div>
+    <textarea id="stickyNotesBody" rows="8" placeholder="Stream ideas, model checklist, todo..." style="width:100%; margin-top:8px;"></textarea>
+    <small class="text-dim">Saved automatically in this browser.</small>
+</div>
+
+<!-- QoL Floating Actions -->
+<div id="qolFab">
+    <button type="button" id="qolScrollTop" title="Scroll to top">↑</button>
+    <button type="button" id="qolCopyStatus" title="Copy system status">📋</button>
+    <button type="button" id="qolRefreshStatus" title="Refresh status bar">↻</button>
 </div>
 
 <!-- Toast Container -->
