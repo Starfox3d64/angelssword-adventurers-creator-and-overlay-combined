@@ -479,3 +479,188 @@ window.addEventListener('DOMContentLoaded',()=>{initPixi();tick();setInterval(ti
     if (lib) obs.observe(lib, { childList: true, subtree: true });
   });
 })();
+
+/* ── Sweep v2.2: bugfixes + QoL ───────────────────────────────────── */
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  // Toast helper
+  function toast(msg, ok) {
+    let el = document.getElementById('l2dToast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'l2dToast';
+      el.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);z-index:99998;padding:10px 16px;border-radius:10px;background:#0c0c0c;border:1px solid rgba(201,162,39,.45);color:#e6dcc8;font-size:.85rem;max-width:90%;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.5)';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.style.borderColor = ok === false ? '#e94560' : 'rgba(201,162,39,.45)';
+    el.style.display = 'block';
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.style.display = 'none'; }, 3200);
+  }
+
+  // Background color presets for chroma checking
+  function ensureBgControls() {
+    const bar = document.querySelector('.viewport-toolbar');
+    if (!bar || document.getElementById('bgPreset')) return;
+    const wrap = document.createElement('span');
+    wrap.style.cssText = 'display:inline-flex;gap:4px;align-items:center;margin-left:6px';
+    wrap.innerHTML = `
+      <label class="chk" style="gap:4px">BG
+        <select id="bgPreset" title="Viewport background">
+          <option value="#030303">Black</option>
+          <option value="#00ff00">Green</option>
+          <option value="#ff00ff">Magenta</option>
+          <option value="#0000ff">Blue</option>
+          <option value="checker">Checker</option>
+        </select>
+      </label>
+      <button type="button" class="btn sm" id="btnFitModel" title="Fit model to view">Fit</button>
+      <button type="button" class="btn sm" id="btnScreenshot" title="Screenshot canvas">📷</button>
+      <button type="button" class="btn sm" id="btnDeleteModel" title="Clear loaded model">Clear</button>
+    `;
+    bar.appendChild(wrap);
+
+    $('bgPreset').onchange = () => {
+      const v = $('bgPreset').value;
+      const vp = $('viewport');
+      if (!vp) return;
+      if (v === 'checker') {
+        vp.style.background = 'repeating-conic-gradient(#333 0% 25%, #111 0% 50%) 50% / 24px 24px';
+      } else {
+        vp.style.background = v;
+      }
+    };
+    $('btnFitModel').onclick = () => {
+      if (!window.model && typeof model === 'undefined') return;
+      const m = (typeof model !== 'undefined') ? model : null;
+      const a = (typeof app !== 'undefined') ? app : null;
+      if (!m || !a) { toast('No model loaded', false); return; }
+      try {
+        const w = a.renderer.width, h = a.renderer.height;
+        m.x = w / 2; m.y = h * 0.55;
+        const sc = Math.min(w, h) / 900;
+        if (typeof scale !== 'undefined') scale = sc;
+        m.scale.set(sc);
+        toast('Fitted to view', true);
+      } catch (e) { toast(e.message, false); }
+    };
+    $('btnScreenshot').onclick = () => {
+      try {
+        const canvas = $('live2dCanvas');
+        if (!canvas) return;
+        const a = document.createElement('a');
+        a.download = 'live2d-screenshot-' + Date.now() + '.png';
+        a.href = canvas.toDataURL('image/png');
+        a.click();
+        toast('Screenshot saved', true);
+      } catch (e) { toast('Screenshot failed: ' + e.message, false); }
+    };
+    $('btnDeleteModel').onclick = () => {
+      try {
+        if (typeof model !== 'undefined' && model && typeof app !== 'undefined' && app) {
+          app.stage.removeChild(model);
+          model.destroy({ children: true });
+          model = null;
+        }
+        if ($('viewportHint')) {
+          $('viewportHint').style.display = 'flex';
+          $('viewportHint').innerHTML = 'Model cleared. Import a <strong>.model3.json</strong> runtime package.';
+        }
+        if ($('stModel')) $('stModel').textContent = 'No model loaded';
+        if ($('paramList')) $('paramList').innerHTML = '';
+        if ($('partList')) $('partList').innerHTML = '';
+        toast('Model cleared', true);
+      } catch (e) { toast(e.message, false); }
+    };
+  }
+
+  // Keyboard shortcuts for Live2D
+  document.addEventListener('keydown', (e) => {
+    const tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return;
+    if (e.key === ' ' && typeof model !== 'undefined' && model) {
+      e.preventDefault();
+      // toggle play motion if select has value
+      const sel = $('motionSelect');
+      if (sel && sel.value) $('btnPlay')?.click();
+    } else if (e.key === '0') {
+      $('btnCenter')?.click();
+    } else if (e.key === '+' || e.key === '=') {
+      $('btnZoomIn')?.click();
+    } else if (e.key === '-') {
+      $('btnZoomOut')?.click();
+    }
+  });
+
+  // Search/filter parameters
+  function ensureParamSearch() {
+    const tab = $('tab-params');
+    if (!tab || $('paramSearch')) return;
+    const row = tab.querySelector('.row') || tab;
+    const input = document.createElement('input');
+    input.id = 'paramSearch';
+    input.type = 'search';
+    input.placeholder = 'Filter parameters…';
+    input.style.cssText = 'width:100%;margin:6px 0;background:#070707;border:1px solid rgba(201,162,39,.3);color:#e6dcc8;border-radius:8px;padding:6px 8px';
+    tab.insertBefore(input, tab.querySelector('.scroll') || tab.firstChild);
+    input.addEventListener('input', () => {
+      const q = input.value.toLowerCase();
+      document.querySelectorAll('#paramList .param-row').forEach((row) => {
+        const id = (row.querySelector('label')?.textContent || '').toLowerCase();
+        row.style.display = !q || id.includes(q) ? '' : 'none';
+      });
+    });
+  }
+
+  // Double-click param label to reset to 0/mid
+  document.addEventListener('dblclick', (e) => {
+    const lab = e.target.closest?.('#paramList .param-row label');
+    if (!lab) return;
+    const row = lab.parentElement;
+    const input = row?.querySelector('input[type=range]');
+    if (!input) return;
+    const min = parseFloat(input.min), max = parseFloat(input.max);
+    input.value = (min <= 0 && max >= 0) ? 0 : (min + max) / 2;
+    input.dispatchEvent(new Event('input'));
+  });
+
+  // Help strip
+  function ensureHelp() {
+    if ($('l2dHelp')) return;
+    const bar = document.querySelector('.status-bar');
+    if (!bar) return;
+    const btn = document.createElement('button');
+    btn.id = 'l2dHelp';
+    btn.className = 'btn sm';
+    btn.style.cssText = 'font-size:0.7rem;padding:2px 8px';
+    btn.textContent = '? Help';
+    btn.onclick = () => {
+      alert(
+        "Live2D Model Suite — Help\\n\\n" +
+        "REQUIRED FILES (from Cubism: File → Export for Runtime):\\n" +
+        "  • Something.model3.json\\n" +
+        "  • Something.moc3\\n" +
+        "  • texture PNGs\\n\\n" +
+        "NOT supported: .cmo3 / .can3 (Editor projects)\\n\\n" +
+        "Shortcuts: Space=play motion, 0=center, +/-=zoom\\n" +
+        "Double-click a parameter name to reset it.\\n" +
+        "Media tab: open Creator PNG/WebM exports."
+      );
+    };
+    bar.appendChild(btn);
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    ensureBgControls();
+    ensureParamSearch();
+    ensureHelp();
+  });
+  // Also run if already loaded
+  if (document.readyState !== 'loading') {
+    ensureBgControls();
+    ensureParamSearch();
+    ensureHelp();
+  }
+})();
