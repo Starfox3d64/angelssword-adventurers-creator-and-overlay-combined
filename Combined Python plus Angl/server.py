@@ -35,10 +35,12 @@ from flask import Flask, send_from_directory, request, jsonify, Response
 APP_DIR = Path(__file__).parent
 OVERLAY_PUBLIC = APP_DIR / "overlay_public"
 CREATOR_PUBLIC = APP_DIR / "creator_public"
+LIVE2D_PUBLIC = APP_DIR / "live2d_public"
+LIVE2D_MODELS = LIVE2D_PUBLIC / "models"
 BIN_DIR = CREATOR_PUBLIC / "bin"
 
 # ── Startup Checks ─────────────────────────────────────────────────────────
-VERSION = "1.8 - Combined Edition"
+VERSION = "2.0 - Don's Adventurer"
 LAST_UPDATED = "July 20, 2026"
 
 
@@ -1172,6 +1174,117 @@ def _start_ws_server():
 
 
 # ── Landing Page ──────────────────────────────────────────────────────────
+
+# ── Live2D Model & Rigging Suite ──────────────────────────────────────
+@app.route("/live2d")
+def live2d_index():
+    return send_from_directory(LIVE2D_PUBLIC, "index.html")
+
+
+@app.route("/live2d/<path:filename>")
+def live2d_files(filename):
+    return send_from_directory(LIVE2D_PUBLIC, filename)
+
+
+@app.route("/api/live2d/models", methods=["GET"])
+def api_live2d_models():
+    LIVE2D_MODELS.mkdir(parents=True, exist_ok=True)
+    models = sorted([d.name for d in LIVE2D_MODELS.iterdir() if d.is_dir() and not d.name.startswith(".")])
+    return jsonify({"models": models})
+
+
+@app.route("/api/live2d/models/<name>", methods=["GET"])
+def api_live2d_model_detail(name):
+    folder = LIVE2D_MODELS / name
+    if not folder.is_dir():
+        return jsonify({"error": "not found"}), 404
+    model3 = None
+    files = []
+    for f in folder.rglob("*"):
+        if f.is_file():
+            rel = str(f.relative_to(folder)).replace("\\\\", "/")
+            files.append(rel)
+            if rel.lower().endswith(".model3.json") and model3 is None:
+                model3 = rel
+    return jsonify({"name": name, "model3": model3, "files": files})
+
+
+
+@app.route("/api/live2d/media", methods=["GET"])
+def api_live2d_media():
+    """List media files dropped into live2d_public/media (Creator exports, etc.)."""
+    media_dir = LIVE2D_PUBLIC / "media"
+    media_dir.mkdir(parents=True, exist_ok=True)
+    items = []
+    for f in sorted(media_dir.rglob("*"), key=lambda x: x.stat().st_mtime if x.is_file() else 0, reverse=True):
+        if not f.is_file():
+            continue
+        ext = f.suffix.lower()
+        if ext not in {".png", ".webp", ".jpg", ".jpeg", ".gif", ".webm", ".mp4", ".mov"}:
+            continue
+        rel = str(f.relative_to(media_dir)).replace("\\\\", "/")
+        items.append({
+            "name": f.name,
+            "path": rel,
+            "url": f"/live2d/media/{rel}",
+            "type": "video" if ext in {".webm", ".mp4", ".mov"} else ("gif" if ext == ".gif" else "image"),
+            "size": f.stat().st_size,
+        })
+    return jsonify({"media": items[:100]})
+
+
+@app.route("/api/live2d/media/upload", methods=["POST"])
+def api_live2d_media_upload():
+    """Upload a Creator export (PNG/WebM/GIF/MP4) into the Model suite media library."""
+    media_dir = LIVE2D_PUBLIC / "media"
+    media_dir.mkdir(parents=True, exist_ok=True)
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"error": "file required"}), 400
+    name = Path(f.filename or "asset.bin").name
+    ext = Path(name).suffix.lower()
+    if ext not in {".png", ".webp", ".jpg", ".jpeg", ".gif", ".webm", ".mp4", ".mov"}:
+        return jsonify({"error": "Unsupported type. Use PNG, GIF, WebM, MP4."}), 400
+    safe = "".join(c if c.isalnum() or c in "._- " else "_" for c in name)[:120]
+    dest = media_dir / safe
+    f.save(dest)
+    return jsonify({"ok": True, "name": safe, "url": f"/live2d/media/{safe}"})
+
+
+@app.route("/api/live2d/upload", methods=["POST"])
+def api_live2d_upload():
+    """Accept a zip of a runtime Live2D package and extract under live2d_public/models/."""
+    import zipfile
+    import re
+    LIVE2D_MODELS.mkdir(parents=True, exist_ok=True)
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"error": "file required"}), 400
+    raw_name = f.filename or "model.zip"
+    if not raw_name.lower().endswith(".zip"):
+        return jsonify({"error": "Only .zip packages are accepted for upload"}), 400
+    safe = re.sub(r"[^a-zA-Z0-9._-]+", "_", Path(raw_name).stem)[:64] or "model"
+    dest = LIVE2D_MODELS / safe
+    dest.mkdir(parents=True, exist_ok=True)
+    tmp = LIVE2D_MODELS / (safe + "_upload.zip")
+    f.save(tmp)
+    try:
+        with zipfile.ZipFile(tmp, "r") as zf:
+            # Block path traversal
+            for info in zf.infolist():
+                target = (dest / info.filename).resolve()
+                if not str(target).startswith(str(dest.resolve())):
+                    return jsonify({"error": "Illegal path in zip"}), 400
+            zf.extractall(dest)
+    finally:
+        try:
+            tmp.unlink()
+        except Exception:
+            pass
+    # If zip contained a single top-level folder, that's fine
+    return jsonify({"ok": True, "name": safe, "path": safe})
+
+
 @app.route("/")
 def landing():
     html = """
@@ -1180,7 +1293,7 @@ def landing():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>⚔️ AS Adventurer — Combined</title>
+        <title>⚔️ Don's Adventurer</title>
         <style>
             :root {
                 --bg-deep: #030303;
@@ -1296,12 +1409,12 @@ def landing():
     </head>
     <body>
         <div class="container">
-            <div class="logo">⚔️ AS Adventurer</div>
+            <div class="logo">⚔️ Don's Adventurer</div>
             <div class="subtitle">Angel's Sword Studios</div>
             
             <div class="tagline">
                 Reactive Overlay + VTuber Creator<br>
-                <span style="font-size:1.1rem; color:#8899aa;">Combined Edition • Python Port</span>
+                <span style="font-size:1.1rem; color:#8899aa;">Don's Adventurer • Overlay · Creator · Live2D</span>
             </div>
             
             <div class="cards">
@@ -1320,6 +1433,15 @@ def landing():
                     <div class="card-desc">
                         Full VTuber asset pipeline: Sprite Prep → AI Video Generation → 
                         Video Prep → Transparent Export.
+                    </div>
+                </a>
+
+                <a href="/live2d" class="card">
+                    <div class="card-icon">🎭</div>
+                    <div class="card-title">Model &amp; Rigging Suite</div>
+                    <div class="card-desc">
+                        Live2D models + Creator exports (PNG / WebM / GIF).
+                        View, play, tweak parameters or transform media.
                     </div>
                 </a>
             </div>
