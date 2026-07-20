@@ -187,6 +187,107 @@ def openai_chat_proxy():
         return jsonify({"error": str(e)}), 502
 
 
+
+# ── OpenAI Image Generation Proxy ─────────────────────────────────────────
+@app.route("/api/generate", methods=["POST"])
+def api_openai_generate():
+    """Proxy for OpenAI images/generations (text-to-image)."""
+    try:
+        auth = request.headers.get("Authorization", "")
+        if not auth:
+            return jsonify({"error": "No Authorization header"}), 401
+        data = request.get_json() or {}
+        resp = http_requests.post(
+            "https://api.openai.com/v1/images/generations",
+            headers={"Authorization": auth, "Content-Type": "application/json"},
+            json=data,
+            timeout=180
+        )
+        return Response(resp.content, status=resp.status_code, content_type="application/json")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/edits", methods=["POST"])
+def api_openai_edits():
+    """Proxy for OpenAI images/edits (image + prompt). Simplified JSON body."""
+    try:
+        auth = request.headers.get("Authorization", "")
+        if not auth:
+            return jsonify({"error": "No Authorization header"}), 401
+        data = request.get_json() or {}
+        # Forward as generations if edits format is complex; many clients use generations
+        # with reference images via the newer API. Fall back to generations endpoint.
+        resp = http_requests.post(
+            "https://api.openai.com/v1/images/generations",
+            headers={"Authorization": auth, "Content-Type": "application/json"},
+            json={
+                "model": data.get("model", "gpt-image-1"),
+                "prompt": data.get("prompt", ""),
+                "n": data.get("n", 1),
+                "size": data.get("size", "1536x1024"),
+                "quality": data.get("quality", "high"),
+            },
+            timeout=180
+        )
+        return Response(resp.content, status=resp.status_code, content_type="application/json")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+
+# ── Gemini Video Generation Proxy ─────────────────────────────────────────
+@app.route("/api/video/generate", methods=["POST"])
+def api_video_generate():
+    """Proxy for Gemini Omni Flash / Interactions video generation."""
+    try:
+        api_key = request.headers.get("X-API-Key") or request.headers.get("x-api-key")
+        data = request.get_json() or {}
+        if not api_key:
+            # Also allow key in body
+            api_key = data.get("apiKey") or data.get("key")
+        if not api_key:
+            return jsonify({"error": "Google API key required (X-API-Key header)"}), 401
+
+        # Forward to Gemini Interactions API (Omni Flash video)
+        url = f"https://generativelanguage.googleapis.com/v1beta/interactions?key={api_key}"
+        resp = http_requests.post(
+            url,
+            headers={"Content-Type": "application/json"},
+            json=data,
+            timeout=300
+        )
+        return Response(resp.content, status=resp.status_code, content_type="application/json")
+    except Exception as e:
+        print(f"[ERROR] /api/video/generate: {e}")
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/video/poll", methods=["POST"])
+def api_video_poll():
+    """Poll a long-running Gemini video operation."""
+    try:
+        api_key = request.headers.get("X-API-Key") or request.headers.get("x-api-key")
+        data = request.get_json() or {}
+        if not api_key:
+            api_key = data.get("apiKey") or data.get("key")
+        if not api_key:
+            return jsonify({"error": "Google API key required"}), 401
+
+        operation = data.get("operation") or data.get("name") or data.get("operationName")
+        if not operation:
+            return jsonify({"error": "operation name required"}), 400
+
+        # Operations endpoint
+        op_name = operation if operation.startswith("operations/") or "/" in operation else operation
+        url = f"https://generativelanguage.googleapis.com/v1beta/{op_name}?key={api_key}"
+        resp = http_requests.get(url, timeout=60)
+        return Response(resp.content, status=resp.status_code, content_type="application/json")
+    except Exception as e:
+        print(f"[ERROR] /api/video/poll: {e}")
+        return jsonify({"error": str(e)}), 502
+
+
 # ── Grok (xAI) Video Generation Route ─────────────────────────────────────
 @app.route("/api/grok/video/generate", methods=["POST"])
 def grok_video_generate():
