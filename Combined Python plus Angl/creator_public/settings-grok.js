@@ -264,14 +264,28 @@ function initComfySettings() {
     }
 
     async function testComfy(url) {
-        // Use server proxy status (checks 127.0.0.1:8188 by default)
-        // For custom URLs we still hit the proxy status endpoint
         try {
-            const res = await fetch('/api/comfyui/status');
+            // Prefer Angular-compatible high-level route; pass URL via connect
+            if (url) {
+                const c = await fetch('/api/comfy/connect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+                const cd = await c.json();
+                return !!cd.ok || !!cd.connected;
+            }
+            const res = await fetch('/api/comfy/status');
             const data = await res.json();
-            return !!data.available;
+            return !!(data.available || data.connected);
         } catch {
-            return false;
+            try {
+                const res = await fetch('/api/comfyui/status');
+                const data = await res.json();
+                return !!data.available;
+            } catch {
+                return false;
+            }
         }
     }
 
@@ -360,12 +374,21 @@ function initComfySettings() {
 
     async function refreshComfyModels() {
         try {
-            const res = await fetch('/api/comfyui/object_info');
-            if (!res.ok) throw new Error('object_info failed');
-            const info = await res.json();
-
-            // Collect checkpoint names from CheckpointLoaderSimple
-            const ckpts = info?.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0] || [];
+            let ckpts = [];
+            try {
+                const mres = await fetch('/api/comfy/models');
+                if (mres.ok) {
+                    const md = await mres.json();
+                    ckpts = md.checkpoints || [];
+                }
+            } catch (_) {}
+            if (!ckpts.length) {
+                const res = await fetch('/api/comfyui/object_info');
+                if (!res.ok) throw new Error('object_info failed');
+                const info = await res.json();
+                ckpts = info?.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0] || [];
+            }
+            const info = {}; // keep downstream shape happy
             const fill = (selectId, list) => {
                 const el = document.getElementById(selectId);
                 if (!el || !Array.isArray(list) || list.length === 0) return;
@@ -887,3 +910,21 @@ function getGrokAuthToken() {
     return localStorage.getItem('grok_api_key') || '';
 }
 window.getGrokAuthToken = getGrokAuthToken;
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('settingsCopyCreatorUrl')?.addEventListener('click', async () => {
+        const url = location.origin + '/creator';
+        try {
+            await navigator.clipboard.writeText(url);
+            if (typeof showToast === 'function') showToast('Creator URL copied', 'success');
+        } catch { prompt('Creator URL', url); }
+    });
+    document.getElementById('settingsCopyObsUrl')?.addEventListener('click', async () => {
+        const url = location.origin + '/overlay/overlay.html';
+        try {
+            await navigator.clipboard.writeText(url);
+            if (typeof showToast === 'function') showToast('OBS URL copied', 'success');
+        } catch { prompt('OBS URL', url); }
+    });
+});
