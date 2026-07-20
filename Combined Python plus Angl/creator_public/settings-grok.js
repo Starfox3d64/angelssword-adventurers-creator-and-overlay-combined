@@ -330,3 +330,271 @@ document.addEventListener('DOMContentLoaded', () => {
     initComfySettings();
     console.log('⚔️ AS Adventurer — Grok + ComfyUI settings initialized');
 });
+
+
+
+// ── Prompt Templates + Data Tools + Status Bar + Shortcuts ─────────────
+
+function getPromptTemplates() {
+    try {
+        return JSON.parse(localStorage.getItem('as_prompt_templates') || '[]');
+    } catch {
+        return [];
+    }
+}
+
+function savePromptTemplates(list) {
+    localStorage.setItem('as_prompt_templates', JSON.stringify(list));
+}
+
+function renderPromptTemplateList() {
+    const listEl = document.getElementById('settingsPromptList');
+    const chipEl = document.getElementById('sgPromptTemplates');
+    const templates = getPromptTemplates();
+
+    if (listEl) {
+        if (!templates.length) {
+            listEl.innerHTML = '<div class="text-dim" style="font-size:0.8rem;">No templates saved yet.</div>';
+        } else {
+            listEl.innerHTML = templates.map((t, i) => `
+                <div style="display:flex; gap:8px; align-items:center; margin:6px 0; padding:6px 8px; background:rgba(0,0,0,0.25); border-radius:6px;">
+                    <strong style="color:#dbb858; min-width:100px;">${escapeHtml(t.name)}</strong>
+                    <span class="text-dim" style="flex:1; font-size:0.75rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(t.body)}</span>
+                    <button class="btn btn-sm btn-secondary" data-tpl-load="${i}">Load</button>
+                    <button class="btn btn-sm btn-danger" data-tpl-del="${i}">✕</button>
+                </div>
+            `).join('');
+            listEl.querySelectorAll('[data-tpl-load]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const t = templates[parseInt(btn.dataset.tplLoad)];
+                    if (!t) return;
+                    document.getElementById('settingsPromptTemplateName').value = t.name;
+                    document.getElementById('settingsPromptTemplateBody').value = t.body;
+                });
+            });
+            listEl.querySelectorAll('[data-tpl-del]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const next = getPromptTemplates();
+                    next.splice(parseInt(btn.dataset.tplDel), 1);
+                    savePromptTemplates(next);
+                    renderPromptTemplateList();
+                    if (typeof showToast === 'function') showToast('Template deleted', 'info');
+                });
+            });
+        }
+    }
+
+    if (chipEl) {
+        const defaults = [
+            { name: 'Idle Loop', body: 'Locked-off Position Static Camera. Perfect Seamless Loop. Subtle idle breathing and blinking. Solid chroma key background.' },
+            { name: 'Talking', body: 'Locked-off Position Static Camera. Perfect Seamless Loop. Subtle talking mouth movements, soft gestures. Solid chroma key background.' },
+            { name: 'Wave', body: 'Locked-off Position Static Camera. Character waves hello with one hand, friendly expression. Solid chroma key background.' },
+        ];
+        const all = [...defaults, ...templates];
+        chipEl.innerHTML = all.map((t, i) =>
+            `<button type="button" class="btn btn-sm btn-secondary" data-chip-prompt="${i}">${escapeHtml(t.name)}</button>`
+        ).join('');
+        chipEl.querySelectorAll('[data-chip-prompt]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const t = all[parseInt(btn.dataset.chipPrompt)];
+                const desc = document.getElementById('sgCharDesc') || document.getElementById('sgCharAction');
+                if (desc && t) {
+                    desc.value = t.body;
+                    if (typeof showToast === 'function') showToast(`Applied template: ${t.name}`, 'success');
+                }
+            });
+        });
+    }
+}
+
+function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[c]);
+}
+
+function initPromptTemplates() {
+    document.getElementById('settingsPromptSave')?.addEventListener('click', () => {
+        const name = document.getElementById('settingsPromptTemplateName')?.value?.trim();
+        const body = document.getElementById('settingsPromptTemplateBody')?.value?.trim();
+        if (!name || !body) {
+            if (typeof showToast === 'function') showToast('Name and prompt text required', 'warning');
+            return;
+        }
+        const list = getPromptTemplates();
+        const idx = list.findIndex(t => t.name === name);
+        if (idx >= 0) list[idx] = { name, body };
+        else list.push({ name, body });
+        savePromptTemplates(list);
+        renderPromptTemplateList();
+        if (typeof showToast === 'function') showToast('Template saved', 'success');
+    });
+
+    document.getElementById('settingsPromptApplySprite')?.addEventListener('click', () => {
+        const body = document.getElementById('settingsPromptTemplateBody')?.value?.trim();
+        if (!body) return;
+        const desc = document.getElementById('sgCharDesc') || document.getElementById('sgCharAction');
+        if (desc) desc.value = body;
+        if (window.switchTab) window.switchTab('tab-sprite-prep');
+        if (typeof showToast === 'function') showToast('Applied to Sprite Prep', 'success');
+    });
+
+    document.getElementById('settingsPromptApplyVideo')?.addEventListener('click', () => {
+        const body = document.getElementById('settingsPromptTemplateBody')?.value?.trim();
+        if (!body) return;
+        const vg = document.getElementById('vgPrompt');
+        if (vg) vg.value = body;
+        if (window.switchTab) window.switchTab('tab-video-gen');
+        if (typeof showToast === 'function') showToast('Applied to Generate Video', 'success');
+    });
+
+    renderPromptTemplateList();
+}
+
+function initDataTools() {
+    const status = document.getElementById('settingsDataStatus');
+
+    document.getElementById('settingsExportPrefs')?.addEventListener('click', () => {
+        const data = {};
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k) data[k] = localStorage.getItem(k);
+        }
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `as-adventurer-settings-${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        if (status) status.innerHTML = '<div class="status-msg success">Settings exported</div>';
+        if (typeof showToast === 'function') showToast('Settings exported', 'success');
+    });
+
+    const fileInput = document.getElementById('settingsImportFile');
+    document.getElementById('settingsImportPrefs')?.addEventListener('click', () => fileInput?.click());
+    fileInput?.addEventListener('change', async () => {
+        const file = fileInput.files?.[0];
+        if (!file) return;
+        try {
+            const json = JSON.parse(await file.text());
+            Object.entries(json).forEach(([k, v]) => {
+                if (typeof v === 'string') localStorage.setItem(k, v);
+            });
+            if (status) status.innerHTML = '<div class="status-msg success">Settings imported — reload recommended</div>';
+            if (typeof showToast === 'function') showToast('Settings imported — refresh the page', 'success');
+            renderPromptTemplateList();
+            initGrokSettings();
+            initComfySettings();
+        } catch (e) {
+            if (status) status.innerHTML = `<div class="status-msg error">Import failed: ${e.message}</div>`;
+        }
+        fileInput.value = '';
+    });
+
+    document.getElementById('settingsResetLocal')?.addEventListener('click', () => {
+        if (!confirm('Clear ALL local AS Adventurer data (API keys, templates, preferences)?')) return;
+        localStorage.clear();
+        if (status) status.innerHTML = '<div class="status-msg warning">Local data cleared — reload the page</div>';
+        if (typeof showToast === 'function') showToast('Local data cleared', 'warning');
+    });
+}
+
+async function refreshGlobalStatusBar() {
+    const ff = document.getElementById('statusFfmpeg');
+    const comfy = document.getElementById('statusComfy');
+    const keys = document.getElementById('statusKeys');
+    const ver = document.getElementById('statusVersion');
+
+    try {
+        const res = await fetch('/health');
+        const data = await res.json();
+        if (ver) ver.textContent = data.version || 'AS Adventurer';
+        if (ff) {
+            const ok = data.services?.ffmpeg?.available;
+            ff.textContent = ok ? 'ffmpeg: ready ✅' : 'ffmpeg: missing';
+            ff.style.color = ok ? '#6bcb77' : '#e94560';
+        }
+        if (comfy) {
+            const ok = data.services?.comfyui?.available;
+            comfy.textContent = ok ? 'ComfyUI: online ✅' : 'ComfyUI: offline';
+            comfy.style.color = ok ? '#6bcb77' : '#8899aa';
+        }
+    } catch {
+        if (ff) ff.textContent = 'ffmpeg: ?';
+        if (comfy) comfy.textContent = 'ComfyUI: ?';
+    }
+
+    if (keys) {
+        const has = [];
+        if (localStorage.getItem('openai_api_key')) has.push('OpenAI');
+        if (localStorage.getItem('google_api_key')) has.push('Gemini');
+        if (localStorage.getItem('grok_api_key')) has.push('Grok');
+        keys.textContent = has.length ? `Keys: ${has.join(', ')}` : 'Keys: none set';
+        keys.style.color = has.length ? '#dbb858' : '#8899aa';
+    }
+}
+
+function initShortcuts() {
+    const modal = document.getElementById('shortcutsModal');
+    const openBtn = document.getElementById('btnShortcutsHelp');
+    const closeBtn = document.getElementById('shortcutsClose');
+
+    const open = () => modal?.classList.remove('hidden');
+    const close = () => modal?.classList.add('hidden');
+
+    openBtn?.addEventListener('click', open);
+    closeBtn?.addEventListener('click', close);
+    modal?.addEventListener('click', (e) => { if (e.target === modal) close(); });
+
+    document.addEventListener('keydown', (e) => {
+        const tag = (e.target && e.target.tagName) || '';
+        const typing = tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable;
+
+        if (e.key === 'Escape') {
+            close();
+            document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(m => m.classList.add('hidden'));
+            return;
+        }
+        if (typing) return;
+
+        if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+            e.preventDefault();
+            open();
+            return;
+        }
+
+        // Tab numbers 1-5
+        if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key >= '1' && e.key <= '5') {
+            const tabs = ['tab-sprite-prep', 'tab-video-gen', 'tab-video-prep', 'tab-exporter', 'tab-settings'];
+            const id = tabs[parseInt(e.key, 10) - 1];
+            if (id && window.switchTab) {
+                e.preventDefault();
+                window.switchTab(id);
+            }
+            return;
+        }
+
+        if (e.ctrlKey || e.metaKey) {
+            const k = e.key.toLowerCase();
+            if (k === 's' && window.switchTab) {
+                e.preventDefault();
+                window.switchTab('tab-settings');
+            } else if (k === 'e' && window.switchTab) {
+                e.preventDefault();
+                window.switchTab('tab-exporter');
+            } else if (k === 'g' && window.switchTab) {
+                e.preventDefault();
+                window.switchTab('tab-video-gen');
+            }
+        }
+    });
+}
+
+// Hook into existing DOMContentLoaded
+document.addEventListener('DOMContentLoaded', () => {
+    initPromptTemplates();
+    initDataTools();
+    initShortcuts();
+    refreshGlobalStatusBar();
+    setInterval(refreshGlobalStatusBar, 30000);
+});

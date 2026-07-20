@@ -1,0 +1,20 @@
+# Dependencies / caches
+__pycache__/
+*.pyc
+.env
+*.log
+node_modules/
+
+# Downloaded binaries (auto-fetched on first run)
+creator_public/bin/ffmpeg
+creator_public/bin/ffmpeg.exe
+bin/ffmpeg
+bin/ffmpeg.exe
+
+# Export temp
+*.webm
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db

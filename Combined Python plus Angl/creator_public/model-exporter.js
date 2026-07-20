@@ -2457,6 +2457,7 @@ class ModelExporter {
             recCanvas.height = height;
             const recCtx = recCanvas.getContext('2d', { willReadFrequently: true });
 
+
             // ── Phase 1: Extract all frames with chroma key ──
             progressText.textContent = 'Extracting frames...';
             const frameImages = [];
@@ -2473,6 +2474,31 @@ class ModelExporter {
                     recCtx.drawImage(this.video, 0, 0, this.video.videoWidth, this.video.videoHeight, dx, dy, sw, sh);
                 }
             };
+
+            // Prefer server ffmpeg for true alpha WebM when available
+            try {
+                const statusRes = await fetch('/api/export/status');
+                if (statusRes.ok) {
+                    const st = await statusRes.json();
+                    if (st.ffmpeg) {
+                        progressText.textContent = 'Using server ffmpeg (true alpha WebM)...';
+                        const blob = await this._exportViaServerFfmpeg(
+                            frameList, width, height, exportFps,
+                            drawScaled, recCanvas, recCtx, progressFill, progressText
+                        );
+                        if (blob) {
+                            this.downloadBlob(blob, 'webm');
+                            window.notificationSound?.play();
+                            if (typeof showToast === 'function') {
+                                showToast('Exported transparent WebM via ffmpeg', 'success');
+                            }
+                            return;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('[ModelExporter] Server ffmpeg export unavailable, using MediaRecorder:', e);
+            }
 
             for (let fi = 0; fi < totalFrames; fi++) {
                 if (this._exportCancelled) break;
@@ -3031,6 +3057,68 @@ class ModelExporter {
             this.video.currentTime = targetTime;
         });
     }
+
+    /**
+     * Server-side transparent WebM export via ffmpeg (true alpha).
+     */
+    async _exportViaServerFfmpeg(frameList, width, height, exportFps, drawScaled, recCanvas, recCtx, progressFill, progressText) {
+        const sessRes = await fetch('/api/export/session', { method: 'POST' });
+        if (!sessRes.ok) return null;
+        const { sessionId } = await sessRes.json();
+        if (!sessionId) return null;
+
+        const total = frameList.length;
+        try {
+            for (let fi = 0; fi < total; fi++) {
+                if (this._exportCancelled) {
+                    await fetch(`/api/export/session/${sessionId}`, { method: 'DELETE' });
+                    throw new Error('cancelled');
+                }
+                const f = frameList[fi];
+                await this.seekToAsync(f / this.fps);
+                drawScaled();
+                const imageData = recCtx.getImageData(0, 0, width, height);
+                this.chromaKey.process(imageData);
+                if (this.chromaKey.antiAlias) this.chromaKey.applyAntiAlias(imageData);
+                this.chromaKey.applyEdgeFade(imageData, this.chromaKey.edgeFadeWidth);
+                recCtx.putImageData(imageData, 0, 0);
+
+                const blob = await new Promise(resolve => recCanvas.toBlob(resolve, 'image/png'));
+                const buf = await blob.arrayBuffer();
+                const up = await fetch(`/api/export/session/${sessionId}/frame?index=${fi}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'image/png' },
+                    body: buf
+                });
+                if (!up.ok) throw new Error(`Frame upload failed at ${fi}`);
+
+                const pct = ((fi + 1) / total) * 70;
+                progressFill.style.width = pct + '%';
+                progressText.textContent = `Uploading frame ${fi + 1} / ${total}...`;
+            }
+
+            progressText.textContent = 'Encoding transparent WebM (ffmpeg)...';
+            progressFill.style.width = '85%';
+
+            const fin = await fetch(`/api/export/session/${sessionId}/finalize`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fps: exportFps, frameCount: total })
+            });
+            if (!fin.ok) {
+                const err = await fin.json().catch(() => ({}));
+                throw new Error(err.error || 'Finalize failed');
+            }
+            progressFill.style.width = '100%';
+            return await fin.blob();
+        } catch (e) {
+            try { await fetch(`/api/export/session/${sessionId}`, { method: 'DELETE' }); } catch (_) {}
+            if (e.message === 'cancelled') throw e;
+            console.warn('[ModelExporter] Server export failed:', e);
+            return null;
+        }
+    }
+
 }
 
 

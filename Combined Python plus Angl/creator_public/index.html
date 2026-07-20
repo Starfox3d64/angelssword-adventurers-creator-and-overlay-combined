@@ -45,7 +45,23 @@
                 <span class="step-badge">④</span> Export
             </span>
         </nav>
+
+        <div class="header-actions" style="display:flex; gap:8px; align-items:center; margin-left:auto; flex-wrap:wrap;">
+            <a href="/overlay" class="btn btn-sm btn-secondary" title="Open Overlay control panel" style="text-decoration:none;">🎮 Overlay</a>
+            <a href="/" class="btn btn-sm btn-secondary" title="Main menu" style="text-decoration:none;">🏠 Menu</a>
+            <button class="btn btn-sm btn-secondary" id="btnShortcutsHelp" title="Keyboard shortcuts">⌨️ Shortcuts</button>
+        </div>
     </header>
+
+    <!-- Status bar -->
+    <div id="globalStatusBar" style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; padding:6px 16px; background:rgba(0,0,0,0.35); border-bottom:1px solid rgba(219,184,88,0.15); font-size:0.75rem; color:#8899aa;">
+        <span id="statusFfmpeg" title="ffmpeg for transparent WebM">ffmpeg: …</span>
+        <span>•</span>
+        <span id="statusComfy" title="Local ComfyUI">ComfyUI: …</span>
+        <span>•</span>
+        <span id="statusKeys" title="Configured API keys">Keys: …</span>
+        <span style="margin-left:auto; color:#556677;" id="statusVersion">AS Adventurer</span>
+    </div>
 
     <!-- ═══════════════════════════════════════
          TAB BAR
@@ -204,6 +220,11 @@
                                 <textarea id="sgCharDesc" rows="3" placeholder="Blue hair, red cape, golden feather cap, adventurer outfit..." title="Describe your character's appearance in detail"></textarea>
                             </div>
 
+                            <div class="form-row" id="sgPromptTemplatesRow">
+                                <label>Quick prompt templates</label>
+                                <div id="sgPromptTemplates" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
+                                <small class="text-dim">Saved in Settings → Prompt Templates. Click to paste into description.</small>
+                            </div>
                             <div class="form-row">
                                 <label for="sgCharAction">Character Action <span class="text-dim">(optional)</span></label>
                                 <input type="text" id="sgCharAction" placeholder="e.g. waving hello, casting a spell (defaults to neutral idle)" title="What is the character doing? Leave empty for a neutral idle pose">
@@ -1317,6 +1338,39 @@
                     </div>
                 </div>
 
+                <!-- Prompt Templates -->
+                <div class="glass-panel">
+                    <div class="panel-title"><span class="title-icon">📝</span> Prompt Templates</div>
+                    <div class="panel-subtitle">Save reusable prompt snippets for Sprite Prep and Generate Video.</div>
+                    <div class="form-row">
+                        <label for="settingsPromptTemplateName">Template name</label>
+                        <input type="text" id="settingsPromptTemplateName" placeholder="e.g. Idle Loop, Wave Hello">
+                    </div>
+                    <div class="form-row">
+                        <label for="settingsPromptTemplateBody">Prompt text</label>
+                        <textarea id="settingsPromptTemplateBody" rows="3" placeholder="Locked-off Position Static Camera. Perfect Seamless Loop..."></textarea>
+                    </div>
+                    <div class="btn-group" style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <button class="btn btn-sm btn-accent" id="settingsPromptSave">Save Template</button>
+                        <button class="btn btn-sm btn-secondary" id="settingsPromptApplySprite">Apply to Sprite Prep</button>
+                        <button class="btn btn-sm btn-secondary" id="settingsPromptApplyVideo">Apply to Video Gen</button>
+                    </div>
+                    <div id="settingsPromptList" class="mt-1"></div>
+                </div>
+
+                <!-- Data Tools -->
+                <div class="glass-panel">
+                    <div class="panel-title"><span class="title-icon">🧰</span> Data Tools</div>
+                    <div class="panel-subtitle">Backup preferences or clear local data. API keys are included in export — keep the file private.</div>
+                    <div class="btn-group" style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <button class="btn btn-sm btn-secondary" id="settingsExportPrefs">⬇ Export Settings JSON</button>
+                        <button class="btn btn-sm btn-secondary" id="settingsImportPrefs">⬆ Import Settings JSON</button>
+                        <button class="btn btn-sm btn-danger" id="settingsResetLocal">🗑 Reset Local Data</button>
+                    </div>
+                    <input type="file" id="settingsImportFile" accept="application/json,.json" class="hidden">
+                    <div id="settingsDataStatus" class="mt-1"></div>
+                </div>
+
                 <!-- About -->
                 <div class="glass-panel">
                     <div class="about-section">
@@ -1345,6 +1399,25 @@
     </div><!-- /tab-content -->
 
 </div><!-- /app-container -->
+
+<!-- Shortcuts Modal -->
+<div id="shortcutsModal" class="modal-overlay hidden" style="z-index:9999;">
+    <div class="modal-panel glass-panel" style="max-width:520px;width:95%;">
+        <div class="panel-title">
+            <span class="title-icon">⌨️</span> Keyboard Shortcuts
+            <button class="btn btn-sm btn-danger" id="shortcutsClose" style="float:right;margin-top:-4px">✕</button>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 16px; font-size:0.9rem; margin-top:12px;">
+            <div><kbd>1</kbd>–<kbd>5</kbd></div><div>Switch tabs (Sprite → Settings)</div>
+            <div><kbd>?</kbd></div><div>Show this help</div>
+            <div><kbd>Esc</kbd></div><div>Close modals</div>
+            <div><kbd>Ctrl</kbd>+<kbd>S</kbd></div><div>Focus Settings</div>
+            <div><kbd>Ctrl</kbd>+<kbd>E</kbd></div><div>Jump to Export tab</div>
+            <div><kbd>Ctrl</kbd>+<kbd>G</kbd></div><div>Jump to Generate Video</div>
+        </div>
+        <p class="text-dim" style="margin-top:14px; font-size:0.8rem;">Shortcuts are ignored while typing in inputs or textareas.</p>
+    </div>
+</div>
 
 <!-- Toast Container -->
 <div class="toast-container" id="toastContainer"></div>
