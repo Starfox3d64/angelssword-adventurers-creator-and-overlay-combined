@@ -3,8 +3,9 @@
 **Reactive Overlay + VTuber Creator** in one program
 
 **Made by TheDonOfEverything aka Paul Conforti**  
-Python port of the original JavaScript version by **Leaflit**  
-Angel's Sword Studios • Version 1.0 • July 2026
+Original JavaScript version by **Leaflit**  
+Angular improvements (v0.3.0) by **OOzeClues**  
+Python Port • Version 1.1 • July 2026
 
 > Everything runs 100% locally on your PC. No Node.js required.
 
@@ -15,16 +16,20 @@ One unified Python application containing:
 - **🎮 Overlay** — Real-time reactive streaming overlay with face tracking, expression detection, and emotes
 - **🎨 Creator** — Full VTuber asset creation pipeline (Sprite Prep → AI Video Generation → Video Prep → Export)
 
+## Supported AI Providers
+
+| Feature             | Providers                                      |
+|---------------------|------------------------------------------------|
+| Sprite generation   | OpenAI • Gemini • Grok (xAI) • Local ComfyUI   |
+| Video generation    | Gemini Omni Flash • Grok Imagine Video • Local ComfyUI |
+| Video Prep + Export | Fully offline                                  |
+
 ## Quick Start (Windows)
 
 1. Extract the folder
 2. Double-click **`Start AS Adventurer.bat`**
 3. Your browser will open to the main menu
-4. Choose:
-   - **Overlay Control Panel**
-   - **Creator Pipeline**
-
-Everything runs **locally on your PC**.
+4. Choose **Overlay** or **Creator**
 
 ## Access Points
 
@@ -34,32 +39,20 @@ Everything runs **locally on your PC**.
 | Overlay       | http://localhost:3000/overlay    |
 | Creator       | http://localhost:3000/creator    |
 
-## Features
+## ComfyUI Support
 
-### Overlay
-- VTube Studio + iFacialMocap face tracking
-- Smart expression detection (Happy, Sad, Surprised, Eyes Closed)
-- Full emote system with nested sub-animations
-- Multiple character models
-- OBS Browser Source ready
+If you have **ComfyUI** running locally on port `8188`:
 
-### Creator
-- Sprite Prep (upload or AI generate)
-- AI Video Generation (Gemini) (Support for Grok and Chatgbt untested)
-- Video Preparation (loops, concat, crossfade)
-- Model Exporter (chroma key + transparent WebM/GIF)
+1. Start ComfyUI first
+2. In the Creator, select **Local ComfyUI** as the generation source
+3. The Python server will proxy requests to `http://127.0.0.1:8188`
 
-## Requirements
+You can check status at: `http://localhost:3000/api/comfyui/status`
 
-- Python 3.10+
-- The `.bat` file will automatically install: `flask`, `websockets`, `numpy`, `requests`
+## Credits
 
-## Final Notes
-
-- The program includes automatic browser opening and no-cache headers so you always see the latest files.
-- Folder existence checks are included for easier troubleshooting.
-- All credit goes to TheDonOfEverything aka Paul Conforti and Leaflit.
+- **TheDonOfEverything aka Paul Conforti** — Python Combined Edition
+- **Leaflit** — Original JavaScript version
+- **OOzeClues** — Angular improvements (v0.3.0) and advanced features
 
 God bless your streams. ⚔️
-
----
