@@ -36,11 +36,14 @@ APP_DIR = Path(__file__).parent
 OVERLAY_PUBLIC = APP_DIR / "overlay_public"
 CREATOR_PUBLIC = APP_DIR / "creator_public"
 LIVE2D_PUBLIC = APP_DIR / "live2d_public"
+MUSIC_PUBLIC = APP_DIR / "music_public"
+MUSIC_LIBRARY = MUSIC_PUBLIC / "library"
+SHARED_PUBLIC = APP_DIR / "shared"
 LIVE2D_MODELS = LIVE2D_PUBLIC / "models"
 BIN_DIR = CREATOR_PUBLIC / "bin"
 
 # ── Startup Checks ─────────────────────────────────────────────────────────
-VERSION = "2.0 - Don's Adventurer"
+VERSION = "2.1 - Don's Adventurer"
 LAST_UPDATED = "July 20, 2026"
 
 
@@ -1503,6 +1506,157 @@ def api_live2d_upload():
     return jsonify({"ok": True, "name": safe, "path": safe})
 
 
+
+# ── Music & Audio Workspace ───────────────────────────────────────────
+@app.route("/music")
+def music_index():
+    return send_from_directory(MUSIC_PUBLIC, "index.html")
+
+
+@app.route("/music/<path:filename>")
+def music_files(filename):
+    return send_from_directory(MUSIC_PUBLIC, filename)
+
+
+@app.route("/shared/<path:filename>")
+def shared_files(filename):
+    return send_from_directory(SHARED_PUBLIC, filename)
+
+
+@app.route("/api/music/library", methods=["GET"])
+def api_music_library():
+    MUSIC_LIBRARY.mkdir(parents=True, exist_ok=True)
+    tracks = []
+    for f in sorted(MUSIC_LIBRARY.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+        if not f.is_file():
+            continue
+        if f.suffix.lower() not in {".mp3", ".wav", ".ogg", ".m4a", ".flac", ".webm"}:
+            continue
+        tracks.append({
+            "id": f.stem,
+            "title": f.stem.replace("_", " "),
+            "url": f"/music/library/{f.name}",
+            "name": f.name,
+            "size": f.stat().st_size,
+        })
+    return jsonify({"tracks": tracks})
+
+
+@app.route("/api/music/upload", methods=["POST"])
+def api_music_upload():
+    MUSIC_LIBRARY.mkdir(parents=True, exist_ok=True)
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"error": "file required"}), 400
+    name = Path(f.filename or "track.wav").name
+    safe = "".join(c if c.isalnum() or c in "._- " else "_" for c in name)[:120]
+    if not Path(safe).suffix:
+        safe += ".wav"
+    dest = MUSIC_LIBRARY / safe
+    # avoid overwrite
+    if dest.exists():
+        dest = MUSIC_LIBRARY / f"{dest.stem}_{int(time.time())}{dest.suffix}"
+    f.save(dest)
+    return jsonify({
+        "ok": True,
+        "id": dest.stem,
+        "title": dest.stem.replace("_", " "),
+        "url": f"/music/library/{dest.name}",
+        "name": dest.name,
+    })
+
+
+@app.route("/api/music/import-url", methods=["POST"])
+def api_music_import_url():
+    """Download remote audio (e.g. Suno CDN) into the library."""
+    MUSIC_LIBRARY.mkdir(parents=True, exist_ok=True)
+    data = request.get_json(silent=True) or {}
+    url = data.get("url")
+    title = (data.get("title") or "suno_track").strip()
+    if not url:
+        return jsonify({"error": "url required"}), 400
+    try:
+        r = http_requests.get(url, timeout=120, stream=True)
+        if not r.ok:
+            return jsonify({"error": f"download failed: {r.status_code}"}), 502
+        ext = ".mp3"
+        ct = (r.headers.get("content-type") or "").lower()
+        if "wav" in ct:
+            ext = ".wav"
+        elif "ogg" in ct:
+            ext = ".ogg"
+        safe = "".join(c if c.isalnum() or c in "._- " else "_" for c in title)[:80] or "track"
+        dest = MUSIC_LIBRARY / f"{safe}_{int(time.time())}{ext}"
+        with open(dest, "wb") as out:
+            for chunk in r.iter_content(65536):
+                if chunk:
+                    out.write(chunk)
+        return jsonify({
+            "ok": True,
+            "id": dest.stem,
+            "title": title,
+            "url": f"/music/library/{dest.name}",
+            "name": dest.name,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/suno/generate", methods=["POST"])
+@app.route("/api/suno/custom_generate", methods=["POST"])
+def api_suno_generate():
+    """Proxy Suno-compatible generate endpoints. Base URL + key from headers."""
+    key = request.headers.get("X-Suno-Key") or ""
+    base = (request.headers.get("X-Suno-Base") or "").rstrip("/")
+    if not key:
+        return jsonify({"error": "Suno API key not set (Settings in Music workspace)"}), 401
+    if not base:
+        return jsonify({"error": "Suno API base URL not set"}), 400
+    path = "/api/custom_generate" if request.path.endswith("custom_generate") else "/api/generate"
+    # Some providers use /generate without /api prefix — try configured base as-is
+    url = base + path
+    alt = base + path.replace("/api", "")
+    body = request.get_json(silent=True) or {}
+    headers = {
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    # Also send common alternate header
+    headers["X-API-Key"] = key
+    try:
+        resp = http_requests.post(url, headers=headers, json=body, timeout=120)
+        if resp.status_code == 404:
+            resp = http_requests.post(alt, headers=headers, json=body, timeout=120)
+        return Response(resp.content, status=resp.status_code, content_type=resp.headers.get("content-type", "application/json"))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/suno/feed", methods=["GET", "POST"])
+def api_suno_feed():
+    key = request.headers.get("X-Suno-Key") or ""
+    base = (request.headers.get("X-Suno-Base") or "").rstrip("/")
+    if not key or not base:
+        return jsonify({"error": "Suno key/base required"}), 400
+    ids = request.args.get("ids") or (request.get_json(silent=True) or {}).get("ids") or ""
+    headers = {"Authorization": f"Bearer {key}", "X-API-Key": key, "Accept": "application/json"}
+    urls = [
+        f"{base}/api/get?ids={ids}",
+        f"{base}/api/feed?ids={ids}",
+        f"{base}/get?ids={ids}",
+    ]
+    last_err = None
+    for url in urls:
+        try:
+            resp = http_requests.get(url, headers=headers, timeout=60)
+            if resp.ok or resp.status_code != 404:
+                return Response(resp.content, status=resp.status_code, content_type="application/json")
+        except Exception as e:
+            last_err = e
+    return jsonify({"error": str(last_err or "feed failed")}), 502
+
+
 @app.route("/")
 def landing():
     html = """
@@ -1632,7 +1786,7 @@ def landing():
             
             <div class="tagline">
                 Reactive Overlay + VTuber Creator<br>
-                <span style="font-size:1.1rem; color:#8899aa;">Don's Adventurer • Overlay · Creator · Live2D</span>
+                <span style="font-size:1.1rem; color:#8899aa;">Don's Adventurer • Overlay · Creator · Live2D · Music</span>
             </div>
             
             <div class="cards">
@@ -1662,6 +1816,15 @@ def landing():
                         View, play, tweak parameters or transform media.
                     </div>
                 </a>
+
+                <a href="/music" class="card">
+                    <div class="card-icon">🎵</div>
+                    <div class="card-title">Music &amp; Audio Workspace</div>
+                    <div class="card-desc">
+                        Suno AI generation, local library, trim/fade tools,
+                        and global BGM that keeps playing across the app.
+                    </div>
+                </a>
             </div>
             
             <div class="credit">
@@ -1680,6 +1843,7 @@ def landing():
                 </span>
             </div>
         </div>
+        <script src="/shared/global-player.js"></script>
     </body>
     </html>
     """

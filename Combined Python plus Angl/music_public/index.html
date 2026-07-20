@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⚔ Don's Adventurer — Music & Audio Workspace</title>
+  <base href="/music/" />
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Outfit:wght@300;400;600&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-icon">🎵</span>
+        <div>
+          <div class="brand-title">Music &amp; Audio Workspace</div>
+          <div class="brand-sub">Suno generation · Library · Trim · Global BGM</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <a class="btn ghost" href="/">🏠 Menu</a>
+        <a class="btn ghost" href="/creator">🎨 Creator</a>
+        <a class="btn ghost" href="/live2d">🎭 Models</a>
+        <a class="btn ghost" href="/overlay">🎮 Overlay</a>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <aside class="panel">
+        <div class="panel-head">⚙️ Suno API</div>
+        <div class="pad">
+          <label>API Base URL</label>
+          <input type="text" id="sunoBase" placeholder="https://api.example.com" />
+          <label>API Key</label>
+          <div class="row">
+            <input type="password" id="sunoKey" placeholder="Your Suno API key" style="flex:1" />
+            <button class="btn sm" id="btnToggleKey">Show</button>
+          </div>
+          <button class="btn primary block" id="btnSaveSuno">Save Key Locally</button>
+          <p class="dim small">Key stays in this browser only. Requests go through the local Python proxy.</p>
+          <div id="sunoStatus" class="status"></div>
+        </div>
+
+        <div class="panel-head">📚 Library</div>
+        <div class="pad">
+          <div class="dropzone" id="audioDrop">Drop MP3 / WAV here or click</div>
+          <input type="file" id="audioFile" accept="audio/*,.mp3,.wav,.ogg,.m4a" hidden multiple />
+          <div id="libraryList" class="lib-list"></div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <div class="tabs">
+          <button class="tab active" data-tab="gen">Generate</button>
+          <button class="tab" data-tab="player">Player</button>
+          <button class="tab" data-tab="trim">Trim / Fade</button>
+        </div>
+
+        <section class="tab-body active" id="tab-gen">
+          <div class="card">
+            <div class="row modes">
+              <label><input type="radio" name="genMode" value="simple" checked /> Standard Prompt</label>
+              <label><input type="radio" name="genMode" value="custom" /> Custom</label>
+              <label><input type="radio" name="genMode" value="bgm" /> BGM (instrumental loop)</label>
+            </div>
+            <div id="simpleFields">
+              <label>Prompt</label>
+              <textarea id="genPrompt" rows="3" placeholder="Upbeat 80s synthwave background music, no vocals"></textarea>
+            </div>
+            <div id="customFields" class="hidden">
+              <label>Title</label>
+              <input type="text" id="genTitle" placeholder="Track title" />
+              <label>Style tags</label>
+              <input type="text" id="genStyle" placeholder="synthwave, ambient, chiptune" />
+              <label>Lyrics (optional)</label>
+              <textarea id="genLyrics" rows="4" placeholder="Leave empty for instrumental"></textarea>
+            </div>
+            <div class="row">
+              <label><input type="checkbox" id="genInstrumental" /> Instrumental only</label>
+              <label><input type="checkbox" id="genBgmPreset" /> Optimize for seamless BGM</label>
+            </div>
+            <button class="btn primary" id="btnGenerate">✨ Generate with Suno</button>
+            <div class="progress hidden" id="genProgress"><div class="fill" id="genFill"></div></div>
+            <div id="genStatus" class="status"></div>
+            <div id="genResults" class="results"></div>
+          </div>
+        </section>
+
+        <section class="tab-body" id="tab-player">
+          <div class="card">
+            <h3 id="playerTitle">No track selected</h3>
+            <audio id="localPlayer" controls style="width:100%"></audio>
+            <div class="row" style="margin-top:12px">
+              <button class="btn primary" id="btnSetGlobal">🌐 Set as Active Global BGM</button>
+              <button class="btn" id="btnLoop">Loop: On</button>
+              <button class="btn" id="btnDownloadTrack">Download</button>
+            </div>
+            <p class="dim small">Global BGM keeps playing when you open Creator, Overlay, Models, or the main menu.</p>
+          </div>
+        </section>
+
+        <section class="tab-body" id="tab-trim">
+          <div class="card">
+            <p class="dim">Load a track from the library first. Trim is non-destructive until you export.</p>
+            <canvas id="waveCanvas" height="80"></canvas>
+            <div class="row">
+              <label>Start (s) <input type="number" id="trimStart" min="0" step="0.1" value="0" class="num" /></label>
+              <label>End (s) <input type="number" id="trimEnd" min="0" step="0.1" value="0" class="num" /></label>
+              <label>Fade in (s) <input type="number" id="fadeIn" min="0" step="0.05" value="0.5" class="num" /></label>
+              <label>Fade out (s) <input type="number" id="fadeOut" min="0" step="0.05" value="0.5" class="num" /></label>
+            </div>
+            <div class="row">
+              <button class="btn" id="btnPreviewTrim">▶ Preview Trim</button>
+              <button class="btn primary" id="btnExportTrim">💾 Export WAV Clip</button>
+            </div>
+            <div id="trimStatus" class="status"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <script src="/shared/global-player.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
