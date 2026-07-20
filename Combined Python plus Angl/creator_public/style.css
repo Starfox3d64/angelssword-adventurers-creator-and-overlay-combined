@@ -2067,3 +2067,178 @@ input:focus, textarea:focus, select:focus {
     background: linear-gradient(180deg, #c9a227, #6b1c23) !important;
     border-radius: 4px;
 }
+
+
+/* ============================================
+   VISIBILITY FIX — roses + gold (readable bars)
+   ============================================ */
+
+/* Progress bars */
+.progress-bar,
+.progress-container .progress-bar {
+    background: #1a0a0c !important;
+    border: 1px solid rgba(201, 162, 39, 0.35) !important;
+    height: 10px !important;
+    border-radius: 6px !important;
+    overflow: hidden !important;
+}
+.progress-bar .fill,
+.progress-container .fill,
+#sgProgressFill, #vgProgressFill, #exProgressFill {
+    background: linear-gradient(90deg, #6b1c23 0%, #8b2942 40%, #c9a227 100%) !important;
+    box-shadow: 0 0 12px rgba(201, 162, 39, 0.45);
+    height: 100% !important;
+}
+
+/* Range sliders — track + thumb visible */
+input[type="range"] {
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    width: 100%;
+    height: 8px !important;
+    background: linear-gradient(90deg, #1a0a0c, #2a1218) !important;
+    border: 1px solid rgba(201, 162, 39, 0.4) !important;
+    border-radius: 6px !important;
+    outline: none !important;
+}
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none !important;
+    width: 18px !important;
+    height: 18px !important;
+    border-radius: 50% !important;
+    background: linear-gradient(145deg, #c9a227, #8b2942) !important;
+    border: 2px solid #f5ecd7 !important;
+    box-shadow: 0 0 10px rgba(201, 162, 39, 0.55);
+    cursor: pointer !important;
+}
+input[type="range"]::-moz-range-thumb {
+    width: 18px !important;
+    height: 18px !important;
+    border-radius: 50% !important;
+    background: linear-gradient(145deg, #c9a227, #8b2942) !important;
+    border: 2px solid #f5ecd7 !important;
+    cursor: pointer !important;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+    height: 8px !important;
+    background: transparent !important;
+}
+
+/* Status / info bars */
+.status-msg {
+    border: 1px solid rgba(201, 162, 39, 0.3) !important;
+    background: rgba(26, 10, 12, 0.9) !important;
+    color: #e6dcc8 !important;
+    padding: 8px 12px !important;
+    border-radius: 8px !important;
+}
+.status-msg.success {
+    border-color: rgba(107, 143, 94, 0.5) !important;
+    background: rgba(20, 35, 20, 0.9) !important;
+    color: #b8e0b0 !important;
+}
+.status-msg.error {
+    border-color: rgba(139, 41, 66, 0.7) !important;
+    background: rgba(40, 12, 18, 0.95) !important;
+    color: #f0c0c8 !important;
+}
+.status-msg.info, .status-msg.warning {
+    border-color: rgba(201, 162, 39, 0.45) !important;
+    background: rgba(30, 22, 10, 0.95) !important;
+    color: #f5ecd7 !important;
+}
+
+/* Tabs / pipeline steps more visible */
+.tab-btn {
+    color: #9a8b6a !important;
+}
+.tab-btn:hover {
+    color: #e6dcc8 !important;
+    background: rgba(139, 41, 66, 0.15) !important;
+}
+.tab-btn.active {
+    color: #c9a227 !important;
+    border-bottom: 2px solid #c9a227 !important;
+    background: rgba(201, 162, 39, 0.08) !important;
+}
+.step {
+    color: #9a8b6a !important;
+}
+.step.active {
+    color: #c9a227 !important;
+    text-shadow: 0 0 10px rgba(201, 162, 39, 0.4);
+}
+.step-badge {
+    background: rgba(139, 41, 66, 0.45) !important;
+    color: #f5ecd7 !important;
+    border: 1px solid rgba(201, 162, 39, 0.4) !important;
+}
+.step.active .step-badge {
+    background: linear-gradient(135deg, #c9a227, #8b2942) !important;
+    color: #0a0a0a !important;
+}
+
+/* Secondary buttons visible */
+.btn-secondary, .btn.btn-sm.btn-secondary {
+    background: rgba(26, 10, 12, 0.95) !important;
+    border: 1px solid rgba(201, 162, 39, 0.4) !important;
+    color: #c9a227 !important;
+}
+.btn-secondary:hover {
+    background: rgba(139, 41, 66, 0.35) !important;
+    border-color: #c9a227 !important;
+    color: #f5ecd7 !important;
+}
+
+/* Toggle switches */
+.toggle-switch .slider,
+.toggle-switch span.slider {
+    background: #2a1218 !important;
+    border: 1px solid rgba(201, 162, 39, 0.35) !important;
+}
+.toggle-switch input:checked + .slider {
+    background: linear-gradient(90deg, #8b2942, #c9a227) !important;
+}
+
+/* Color swatches outline */
+.color-swatch {
+    border: 2px solid rgba(201, 162, 39, 0.35) !important;
+}
+.color-swatch.selected {
+    border-color: #c9a227 !important;
+    box-shadow: 0 0 12px rgba(201, 162, 39, 0.5) !important;
+}
+
+/* Scrollbars always visible */
+::-webkit-scrollbar {
+    width: 10px !important;
+    height: 10px !important;
+}
+::-webkit-scrollbar-track {
+    background: #0a0a0a !important;
+}
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #c9a227, #8b2942) !important;
+    border-radius: 6px !important;
+    border: 2px solid #0a0a0a;
+}
+
+/* Range value labels */
+.range-value {
+    color: #c9a227 !important;
+    font-weight: 600 !important;
+    min-width: 3ch;
+}
+
+/* Disabled buttons still readable */
+button:disabled, .btn:disabled {
+    opacity: 0.45 !important;
+    filter: grayscale(0.3);
+}
+
+/* Info banners */
+.info-banner {
+    background: rgba(26, 10, 12, 0.9) !important;
+    border: 1px solid rgba(201, 162, 39, 0.3) !important;
+    color: #e6dcc8 !important;
+}

@@ -684,3 +684,95 @@ document.addEventListener('DOMContentLoaded', () => {
     initFab();
     initBeforeUnloadGuard();
 });
+
+
+
+// ── Clock, sticky notes, clipboard paste image ─────────────────────────
+
+function initStatusClock() {
+    const el = document.getElementById('statusClock');
+    if (!el) return;
+    const tick = () => {
+        const d = new Date();
+        el.textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
+    tick();
+    setInterval(tick, 15000);
+}
+
+function initStickyNotes() {
+    const panel = document.getElementById('stickyNotesPanel');
+    const body = document.getElementById('stickyNotesBody');
+    const btn = document.getElementById('btnStickyNotes');
+    const close = document.getElementById('stickyNotesClose');
+    if (!panel || !body) return;
+
+    body.value = localStorage.getItem('as_sticky_notes') || '';
+    body.addEventListener('input', () => {
+        localStorage.setItem('as_sticky_notes', body.value);
+    });
+    btn?.addEventListener('click', () => panel.classList.toggle('hidden'));
+    close?.addEventListener('click', () => panel.classList.add('hidden'));
+}
+
+function initClipboardPasteImage() {
+    document.addEventListener('paste', async (e) => {
+        const tag = (e.target && e.target.tagName) || '';
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        for (const item of items) {
+            if (!item.type.startsWith('image/')) continue;
+            e.preventDefault();
+            const file = item.getAsFile();
+            if (!file) return;
+
+            // Prefer sprite prep file input
+            const input = document.getElementById('spFileInput') || document.getElementById('vgFileInput');
+            if (input) {
+                const dt = new DataTransfer();
+                dt.items.add(new File([file], 'pasted.png', { type: file.type }));
+                input.files = dt.files;
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+                if (typeof showToast === 'function') showToast('Image pasted', 'success');
+            }
+            break;
+        }
+    });
+}
+
+function initCopyPromptButtons() {
+    // Add small copy buttons next to main prompt areas if missing
+    const pairs = [
+        ['sgCharDesc', 'Copy character description'],
+        ['vgPrompt', 'Copy video prompt'],
+    ];
+    pairs.forEach(([id, title]) => {
+        const el = document.getElementById(id);
+        if (!el || el.dataset.copyBound) return;
+        el.dataset.copyBound = '1';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-sm btn-secondary';
+        btn.textContent = '📋 Copy';
+        btn.title = title;
+        btn.style.marginTop = '4px';
+        btn.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(el.value || '');
+                if (typeof showToast === 'function') showToast('Copied', 'success');
+            } catch {
+                if (typeof showToast === 'function') showToast('Copy failed', 'error');
+            }
+        });
+        el.parentElement?.appendChild(btn);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initStatusClock();
+    initStickyNotes();
+    initClipboardPasteImage();
+    initCopyPromptButtons();
+});
