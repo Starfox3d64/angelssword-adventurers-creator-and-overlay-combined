@@ -340,6 +340,13 @@
         });
     }
 
+    function getSelectedImageSource() {
+        // Prefer the active button in the source selector
+        const activeBtn = document.querySelector('#sgSourceSelector .mode-btn.active');
+        if (activeBtn?.dataset?.source) return activeBtn.dataset.source;
+        return localStorage.getItem('sg_source') || localStorage.getItem('ai_provider') || 'openai';
+    }
+
     async function generate() {
         if (generating) return;
 
@@ -350,10 +357,38 @@
             return;
         }
 
-        const apiKey = localStorage.getItem('openai_api_key');
-        if (!apiKey) {
-            showToast('No OpenAI API key. Go to Settings to add one.', 'error');
-            return;
+        const source = getSelectedImageSource();
+        console.log('[SpritePrep] Generation source:', source);
+
+        // Validate keys / ComfyUI availability
+        if (source === 'openai') {
+            if (!localStorage.getItem('openai_api_key')) {
+                showToast('No OpenAI API key. Go to Settings to add one.', 'error');
+                return;
+            }
+        } else if (source === 'gemini') {
+            if (!localStorage.getItem('google_api_key')) {
+                showToast('No Google Gemini API key. Go to Settings to add one.', 'error');
+                return;
+            }
+        } else if (source === 'grok') {
+            if (!localStorage.getItem('grok_api_key')) {
+                showToast('No Grok API key. Go to Settings to add one.', 'error');
+                return;
+            }
+        } else if (source === 'comfyui') {
+            // Quick status check
+            try {
+                const st = await fetch('/api/comfyui/status');
+                const data = await st.json();
+                if (!data.available) {
+                    showToast('ComfyUI is offline. Start it first (default port 8188).', 'error');
+                    return;
+                }
+            } catch {
+                showToast('Cannot reach ComfyUI proxy. Is the server running?', 'error');
+                return;
+            }
         }
 
         // Get generation count
@@ -364,12 +399,11 @@
         generating = true;
         genCancelled = false;
 
-        // Show progress
         document.getElementById('sgProgress').classList.add('active');
         document.getElementById('sgGenerateBtn').disabled = true;
 
         const status = document.getElementById('sgStatus');
-        status.innerHTML = '<div class="status-msg info"><span class="spinner"></span> Generating sprite — this may take up to a minute…</div>';
+        status.innerHTML = `<div class="status-msg info"><span class="spinner"></span> Generating via ${source} — this may take a minute…</div>`;
 
         try {
             let promptText = buildPrompt();
@@ -379,11 +413,10 @@
             if (charRefBase64) images.push({ label: 'character_reference', data: charRefBase64 });
             if (styleRefBase64) images.push({ label: 'style_reference', data: styleRefBase64 });
 
-            // Launch parallel generations
             const promises = [];
             for (let i = 0; i < genCount; i++) {
                 if (genCancelled) break;
-                promises.push(generateOne(apiKey, promptText, images));
+                promises.push(generateOne(source, promptText, images));
             }
 
             const results = await Promise.allSettled(promises);
@@ -392,15 +425,17 @@
             for (const result of results) {
                 if (result.status === 'fulfilled' && result.value) {
                     genResults.push(result.value);
+                } else if (result.status === 'rejected') {
+                    console.warn('[SpritePrep] Generation failed:', result.reason);
                 }
             }
 
             if (genResults.length > 0) {
                 displayResults();
                 window.notificationSound?.play();
-                status.innerHTML = `<div class="status-msg success">✅ Generated ${genResults.length} sprite(s)!</div>`;
+                status.innerHTML = `<div class="status-msg success">✅ Generated ${genResults.length} sprite(s) via ${source}!</div>`;
             } else if (!genCancelled) {
-                status.innerHTML = '<div class="status-msg error">❌ All generations failed. Check your API key and try again.</div>';
+                status.innerHTML = '<div class="status-msg error">❌ All generations failed. Check your API key / ComfyUI and try again.</div>';
             }
         } catch (err) {
             status.innerHTML = `<div class="status-msg error">❌ ${err.message}</div>`;
@@ -411,18 +446,31 @@
         }
     }
 
-    async function generateOne(apiKey, prompt, images) {
+    async function generateOne(source, prompt, images) {
+        if (source === 'openai') {
+            return generateOpenAI(prompt, images);
+        } else if (source === 'gemini') {
+            return generateGemini(prompt, images);
+        } else if (source === 'grok') {
+            return generateGrok(prompt, images);
+        } else if (source === 'comfyui') {
+            return generateComfyUI(prompt, images);
+        }
+        throw new Error('Unknown generation source: ' + source);
+    }
+
+    async function generateOpenAI(prompt, images) {
+        const apiKey = localStorage.getItem('openai_api_key');
         const hasImages = images.length > 0;
         const endpoint = hasImages ? '/api/edits' : '/api/generate';
 
         const body = {
-            model: 'gpt-image-2',
+            model: 'gpt-image-1',
             prompt: prompt,
             n: 1,
-            size: '1536x1024', // Closest to 1280x720 that the API supports (landscape)
+            size: '1536x1024',
             quality: 'high'
         };
-
         if (hasImages) body.images = images;
 
         const response = await fetch(endpoint, {
@@ -436,14 +484,189 @@
 
         if (!response.ok) {
             const err = await response.json().catch(() => ({}));
-            throw new Error(err?.error?.message || `API error: ${response.status}`);
+            throw new Error(err?.error?.message || `OpenAI error: ${response.status}`);
         }
 
         const data = await response.json();
         const b64 = data?.data?.[0]?.b64_json;
-        if (!b64) throw new Error('No image in API response');
-
+        if (!b64) throw new Error('No image in OpenAI response');
         return `data:image/png;base64,${b64}`;
+    }
+
+    async function generateGemini(prompt, images) {
+        const apiKey = localStorage.getItem('google_api_key');
+        // Use Gemini image generation via Google API (imagen / gemini flash image)
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent?key=${apiKey}`;
+
+        const parts = [{ text: prompt }];
+        // Attach first reference image if present
+        if (images.length > 0 && images[0].data) {
+            const raw = images[0].data.includes(',') ? images[0].data.split(',')[1] : images[0].data;
+            parts.push({ inline_data: { mime_type: 'image/png', data: raw } });
+        }
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ role: 'user', parts }],
+                generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
+            })
+        });
+
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err?.error?.message || `Gemini error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const partsOut = data?.candidates?.[0]?.content?.parts || [];
+        for (const part of partsOut) {
+            if (part.inlineData?.data) {
+                const mime = part.inlineData.mimeType || 'image/png';
+                return `data:${mime};base64,${part.inlineData.data}`;
+            }
+            if (part.inline_data?.data) {
+                const mime = part.inline_data.mime_type || 'image/png';
+                return `data:${mime};base64,${part.inline_data.data}`;
+            }
+        }
+        throw new Error('No image in Gemini response');
+    }
+
+    async function generateGrok(prompt, images) {
+        const apiKey = localStorage.getItem('grok_api_key');
+        // xAI image generation (OpenAI-compatible style where available)
+        const response = await fetch('https://api.x.ai/v1/images/generations', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'grok-2-image',
+                prompt: prompt,
+                n: 1,
+                response_format: 'b64_json'
+            })
+        });
+
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err?.error?.message || `Grok error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const b64 = data?.data?.[0]?.b64_json;
+        if (b64) return `data:image/png;base64,${b64}`;
+        const url = data?.data?.[0]?.url;
+        if (url) {
+            // Fetch remote URL and convert to data URL via canvas is complex; return URL as-is for preview
+            return url;
+        }
+        throw new Error('No image in Grok response');
+    }
+
+    async function generateComfyUI(prompt, images) {
+        // Basic ComfyUI text-to-image via /api/comfyui proxy
+        // 1) Queue a simple workflow  2) Poll history  3) Fetch image
+
+        const workflow = {
+            "3": {
+                "class_type": "KSampler",
+                "inputs": {
+                    "seed": Math.floor(Math.random() * 1e15),
+                    "steps": 20,
+                    "cfg": 7,
+                    "sampler_name": "euler",
+                    "scheduler": "normal",
+                    "denoise": 1,
+                    "model": ["4", 0],
+                    "positive": ["6", 0],
+                    "negative": ["7", 0],
+                    "latent_image": ["5", 0]
+                }
+            },
+            "4": {
+                "class_type": "CheckpointLoaderSimple",
+                "inputs": { "ckpt_name": "v1-5-pruned-emaonly.safetensors" }
+            },
+            "5": {
+                "class_type": "EmptyLatentImage",
+                "inputs": { "width": 1280, "height": 720, "batch_size": 1 }
+            },
+            "6": {
+                "class_type": "CLIPTextEncode",
+                "inputs": { "text": prompt, "clip": ["4", 1] }
+            },
+            "7": {
+                "class_type": "CLIPTextEncode",
+                "inputs": { "text": "blurry, low quality, watermark, text", "clip": ["4", 1] }
+            },
+            "8": {
+                "class_type": "VAEDecode",
+                "inputs": { "samples": ["3", 0], "vae": ["4", 2] }
+            },
+            "9": {
+                "class_type": "SaveImage",
+                "inputs": { "filename_prefix": "AS_Adventurer", "images": ["8", 0] }
+            }
+        };
+
+        // Queue prompt
+        const queueRes = await fetch('/api/comfyui/prompt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: workflow })
+        });
+
+        if (!queueRes.ok) {
+            const err = await queueRes.json().catch(() => ({}));
+            throw new Error(err?.error || `ComfyUI queue failed: ${queueRes.status}. Make sure a checkpoint named v1-5-pruned-emaonly.safetensors exists, or run a workflow manually in ComfyUI.`);
+        }
+
+        const queueData = await queueRes.json();
+        const promptId = queueData.prompt_id || queueData.promptId;
+        if (!promptId) {
+            // Some ComfyUI setups return differently; try to get latest image from history
+            throw new Error('ComfyUI did not return a prompt_id. Check that ComfyUI is running and the workflow is valid.');
+        }
+
+        // Poll history for up to ~2 minutes
+        const maxAttempts = 60;
+        for (let i = 0; i < maxAttempts; i++) {
+            if (genCancelled) throw new Error('Cancelled');
+            await new Promise(r => setTimeout(r, 2000));
+
+            const histRes = await fetch(`/api/comfyui/history/${promptId}`);
+            if (!histRes.ok) continue;
+            const hist = await histRes.json();
+            const entry = hist[promptId];
+            if (!entry) continue;
+
+            const outputs = entry.outputs || {};
+            for (const nodeId of Object.keys(outputs)) {
+                const imagesOut = outputs[nodeId].images;
+                if (imagesOut && imagesOut.length > 0) {
+                    const img = imagesOut[0];
+                    const viewUrl = `/api/comfyui/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder || '')}&type=${encodeURIComponent(img.type || 'output')}`;
+                    const imgRes = await fetch(viewUrl);
+                    if (!imgRes.ok) throw new Error('Failed to download ComfyUI image');
+                    const blob = await imgRes.blob();
+                    return await blobToDataURL(blob);
+                }
+            }
+        }
+        throw new Error('ComfyUI timed out waiting for image');
+    }
+
+    function blobToDataURL(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
     }
 
     function displayResults() {
