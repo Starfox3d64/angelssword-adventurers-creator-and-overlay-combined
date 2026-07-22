@@ -2344,7 +2344,7 @@ def landing():
                     <button type="button" class="theme-btn" data-theme-set="leaflit">Leaflit</button>
                     <button type="button" class="theme-btn" data-theme-set="ooz">Ooz</button>
                     <button type="button" class="theme-btn" data-theme-set="original">Original (Purple/Gold)</button>
-                    <button type="button" class="theme-btn" id="asMainF1Btn" onclick="window.__ASShowHelp&&window.__ASShowHelp()" title="Help, tips & tricks (F1)">F1 Help & Tips</button>
+                    <button type="button" class="theme-btn" id="asMainF1Btn" class="theme-btn as-f1-main" onclick="window.__ASShowHelp&&window.__ASShowHelp()" title="Help, tips & tricks (F1)">❓ F1 Help & Tips</button>
                 </div>
                 <p style="margin:8px 0 0;font-size:12px;color:var(--muted,#9a8b6a)">Press <b style="color:var(--accent,#c9a227)">F1</b> anytime for suite tips · Themes apply to every page</p>
             </div>
