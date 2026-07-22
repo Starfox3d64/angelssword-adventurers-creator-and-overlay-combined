@@ -423,7 +423,214 @@
 
 
 
-  <script src="/live2d/app.js?v=20"></script>
+  <script src="/live2d/app.js?v=21"></script>
+
+<script>
+/* FORCE CAPTURE — self-contained, does not depend on app.js */
+(function () {
+  function el(id) { return document.getElementById(id); }
+
+  function isMediaMode() {
+    var stage = el('mediaStage');
+    var medBtn = el('btnModeMedia');
+    if (medBtn && medBtn.classList.contains('active-mode')) return true;
+    if (stage && !stage.classList.contains('hidden') && stage.style.display !== 'none') {
+      var img = el('mediaImage');
+      var vid = el('mediaVideo');
+      if (img && img.src && !img.classList.contains('hidden')) return true;
+      if (vid && (vid.src || vid.currentSrc) && !vid.classList.contains('hidden')) return true;
+    }
+    return false;
+  }
+
+  function grabMedia() {
+    var img = el('mediaImage');
+    var vid = el('mediaVideo');
+    var c = document.createElement('canvas');
+    var ctx = c.getContext('2d');
+    // Prefer video if visible and has frames
+    if (vid && !vid.classList.contains('hidden') && vid.style.display !== 'none' && vid.videoWidth > 0) {
+      c.width = vid.videoWidth;
+      c.height = vid.videoHeight;
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(vid, 0, 0);
+      return c;
+    }
+    if (img && img.src) {
+      // Wait if not decoded
+      var w = img.naturalWidth || img.width;
+      var h = img.naturalHeight || img.height;
+      if (!w || !h) {
+        // try drawing anyway at display size
+        w = img.clientWidth || 512;
+        h = img.clientHeight || 512;
+      }
+      c.width = w;
+      c.height = h;
+      try {
+        ctx.drawImage(img, 0, 0, w, h);
+        return c;
+      } catch (err) {
+        console.error('drawImage img', err);
+        return null;
+      }
+    }
+    return null;
+  }
+
+  function grabLive2D() {
+    // PIXI global from app.js (var app / window)
+    var pixiApp = null;
+    try {
+      if (typeof app !== 'undefined' && app && app.renderer) pixiApp = app;
+    } catch (_) {}
+    if (!pixiApp && window.__ASPixiApp) pixiApp = window.__ASPixiApp;
+
+    if (pixiApp && pixiApp.renderer) {
+      try {
+        try { pixiApp.renderer.render(pixiApp.stage); } catch (_) {}
+        var r = pixiApp.renderer;
+        if (r.extract && typeof r.extract.canvas === 'function') {
+          return r.extract.canvas(pixiApp.stage);
+        }
+        if (r.plugins && r.plugins.extract && r.plugins.extract.canvas) {
+          return r.plugins.extract.canvas(pixiApp.stage);
+        }
+      } catch (e) {
+        console.warn('pixi extract', e);
+      }
+    }
+
+    var canvas = el('live2dCanvas');
+    if (canvas && canvas.width > 0) {
+      var out = document.createElement('canvas');
+      out.width = canvas.width;
+      out.height = canvas.height;
+      try {
+        out.getContext('2d').drawImage(canvas, 0, 0);
+        return out;
+      } catch (e2) {
+        console.warn('canvas draw', e2);
+        // Last resort: use the canvas element itself via toDataURL
+        return canvas;
+      }
+    }
+    return null;
+  }
+
+  function grab() {
+    if (isMediaMode()) {
+      var m = grabMedia();
+      if (m) return m;
+    }
+    return grabLive2D();
+  }
+
+  function doScreenshot() {
+    try {
+      var c = grab();
+      if (!c) {
+        alert('Nothing to capture.
+1) Switch to Media and open an image/video, OR
+2) Load a Live2D .model3.json package.');
+        return;
+      }
+      var url = c.toDataURL('image/png');
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'as-capture-' + Date.now() + '.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) {
+      alert('Screenshot error: ' + e.message);
+      console.error(e);
+    }
+  }
+
+  function doCopy() {
+    try {
+      var c = grab();
+      if (!c) {
+        alert('Nothing to capture. Load media or a model first.');
+        return;
+      }
+      c.toBlob(function (blob) {
+        if (!blob) {
+          // fallback download
+          doScreenshot();
+          return;
+        }
+        if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+          navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+            .then(function () { alert('Copied to clipboard'); })
+            .catch(function () {
+              var a = document.createElement('a');
+              a.href = URL.createObjectURL(blob);
+              a.download = 'as-capture-' + Date.now() + '.png';
+              a.click();
+              alert('Clipboard blocked — file downloaded instead');
+            });
+        } else {
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'as-capture-' + Date.now() + '.png';
+          a.click();
+          alert('Downloaded PNG (clipboard API not available)');
+        }
+      }, 'image/png');
+    } catch (e) {
+      alert('Copy error: ' + e.message);
+      console.error(e);
+    }
+  }
+
+  window.__ASForceCapture = { shot: doScreenshot, copy: doCopy, grab: grab };
+
+  function wire() {
+    // Direct bind every matching control
+    ['btnScreenshot', 'btnCopyView'].forEach(function (id) {
+      var nodes = document.querySelectorAll('#' + id);
+      nodes.forEach(function (btn) {
+        btn.onclick = function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (id === 'btnCopyView') doCopy();
+          else doScreenshot();
+        };
+      });
+    });
+  }
+
+  // Capture phase: win even if something else stops the event
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (!t) return;
+    var btn = t.closest ? t.closest('#btnScreenshot, #btnCopyView, [data-action="screenshot"], [data-action="copyview"]') : null;
+    if (!btn) {
+      // also match by text content as last resort
+      if (t.tagName === 'BUTTON' && (t.textContent || '').indexOf('Screenshot') >= 0) btn = t;
+      if (t.tagName === 'BUTTON' && (t.textContent || '').indexOf('📋') >= 0) btn = t;
+      if (t.tagName === 'BUTTON' && (t.textContent || '').indexOf('📷') >= 0) btn = t;
+    }
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    if (btn.id === 'btnCopyView' || (btn.getAttribute && btn.getAttribute('data-action') === 'copyview') || (btn.textContent || '').indexOf('📋') >= 0) {
+      doCopy();
+    } else {
+      doScreenshot();
+    }
+  }, true);
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
+  else wire();
+  setInterval(wire, 2000); // re-bind if toolbar re-creates buttons
+})();
+</script>
+
 <script src="/shared/global-player.js"></script>
 <script src="/shared/theme-nav.js"></script>
 <script src="/shared/notes.js"></script>
