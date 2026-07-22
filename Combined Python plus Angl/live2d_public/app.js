@@ -618,17 +618,8 @@ window.addEventListener('DOMContentLoaded',()=>{initPixi();tick();setInterval(ti
         toast('Fitted to view', true);
       } catch (e) { toast(e.message, false); }
     };
-    $('btnScreenshot').onclick = () => {
-      try {
-        const canvas = $('live2dCanvas');
-        if (!canvas) return;
-        const a = document.createElement('a');
-        a.download = 'live2d-screenshot-' + Date.now() + '.png';
-        a.href = canvas.toDataURL('image/png');
-        a.click();
-        toast('Screenshot saved', true);
-      } catch (e) { toast('Screenshot failed: ' + e.message, false); }
-    };
+    $('btnScreenshot').onclick = () => { window.__ASCaptureView && window.__ASCaptureView.download(); };
+    if ($('btnCopyView')) $('btnCopyView').onclick = () => { window.__ASCaptureView && window.__ASCaptureView.copy(); };
     $('btnDeleteModel').onclick = () => {
       try {
         if (typeof model !== 'undefined' && model && typeof app !== 'undefined' && app) {
