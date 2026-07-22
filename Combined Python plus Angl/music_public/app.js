@@ -821,3 +821,50 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();
+
+
+/* Force-bind Fade stop (overrides earlier handlers) */
+(function () {
+  function fadeAudio(audio, ms) {
+    if (!audio) return false;
+    var start = audio.volume;
+    if (!(start > 0)) start = 0.8;
+    var t0 = performance.now();
+    function step(t) {
+      var p = Math.min(1, (t - t0) / (ms || 1200));
+      try { audio.volume = start * (1 - p); } catch (e) {}
+      if (p < 1) requestAnimationFrame(step);
+      else {
+        try { audio.pause(); } catch (e) {}
+        try { audio.volume = start; } catch (e) {}
+      }
+    }
+    requestAnimationFrame(step);
+    return true;
+  }
+  function doFadeForce() {
+    var any = false;
+    var local = document.getElementById('localPlayer');
+    if (local && local.src && !local.paused) any = fadeAudio(local, 1200) || any;
+    var g = window.__ASGlobalAudio;
+    if (g && g.audio && !g.audio.paused) any = fadeAudio(g.audio, 1200) || any;
+    if (g && g.audio && g.audio.paused === false) any = true;
+    if (!any) {
+      if (local) try { local.pause(); } catch (e) {}
+      if (g && typeof g.pause === 'function') g.pause();
+      alert('Nothing playing — players paused.');
+    }
+  }
+  function bind() {
+    var btn = document.getElementById('btnFadeStop');
+    if (!btn) return;
+    btn.onclick = function (e) {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      doFadeForce();
+    };
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
+  else bind();
+  setTimeout(bind, 300);
+  setTimeout(bind, 1500);
+})();
