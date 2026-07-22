@@ -4,7 +4,7 @@ const $=id=>document.getElementById(id);
 function tick(){const e=$("stClock");if(e)e.textContent=new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});}
 document.querySelectorAll(".tab").forEach(tab=>{tab.onclick=()=>{document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));document.querySelectorAll(".tab-body").forEach(b=>b.classList.remove("active"));tab.classList.add("active");const b=document.getElementById("tab-"+tab.dataset.tab);if(b)b.classList.add("active");};});
 let app,model,modelJson,files=new Map(),scale=1;
-function initPixi(){if(!window.PIXI){ $("viewportHint").innerHTML="PIXI CDN failed to load.";return;} const host=$("viewport"); app=new PIXI.Application({view:$("live2dCanvas"),resizeTo:host,backgroundAlpha:0,antialias:true}); let drag=false,lx=0,ly=0; host.onpointerdown=e=>{drag=true;lx=e.clientX;ly=e.clientY;}; window.onpointerup=()=>drag=false; host.onpointermove=e=>{if(!drag||!model)return;model.x+=e.clientX-lx;model.y+=e.clientY-ly;lx=e.clientX;ly=e.clientY;}; host.addEventListener("wheel",e=>{e.preventDefault();if(!model)return;scale*=e.deltaY>0?0.92:1.08;model.scale.set(scale);},{passive:false});}
+function initPixi(){if(!window.PIXI){ $("viewportHint").innerHTML="PIXI CDN failed to load.";return;} const host=$("viewport"); app=new PIXI.Application({view:$("live2dCanvas"),resizeTo:host,backgroundAlpha:0,antialias:true,preserveDrawingBuffer:true}); let drag=false,lx=0,ly=0; host.onpointerdown=e=>{drag=true;lx=e.clientX;ly=e.clientY;}; window.onpointerup=()=>drag=false; host.onpointermove=e=>{if(!drag||!model)return;model.x+=e.clientX-lx;model.y+=e.clientY-ly;lx=e.clientX;ly=e.clientY;}; host.addEventListener("wheel",e=>{e.preventDefault();if(!model)return;scale*=e.deltaY>0?0.92:1.08;model.scale.set(scale);},{passive:false});}
 async function ingestFiles(list){
   const mediaExt=/\.(png|jpe?g|webp|gif|webm|mp4|mov)$/i;
   let loadedMedia=false;
@@ -589,7 +589,7 @@ window.addEventListener('DOMContentLoaded',()=>{initPixi();tick();setInterval(ti
         </select>
       </label>
       <button type="button" class="btn sm" id="btnFitModel" title="Fit model to view">Fit</button>
-      <button type="button" class="btn sm" id="btnScreenshot" title="Screenshot canvas">📷</button>
+      <button type="button" class="btn sm" id="btnScreenshot" data-action="screenshot" title="Screenshot">📷</button>
       <button type="button" class="btn sm" id="btnDeleteModel" title="Clear loaded model">Clear</button>
     `;
     bar.appendChild(wrap);
@@ -618,8 +618,10 @@ window.addEventListener('DOMContentLoaded',()=>{initPixi();tick();setInterval(ti
         toast('Fitted to view', true);
       } catch (e) { toast(e.message, false); }
     };
-    $('btnScreenshot').onclick = () => { window.__ASCaptureView && window.__ASCaptureView.download(); };
-    if ($('btnCopyView')) $('btnCopyView').onclick = () => { window.__ASCaptureView && window.__ASCaptureView.copy(); };
+
+    $('btnScreenshot').onclick = () => { if (window.__ASCaptureView) window.__ASCaptureView.download(); };
+    const copyBtn = $('btnCopyView');
+    if (copyBtn) copyBtn.onclick = () => { if (window.__ASCaptureView) window.__ASCaptureView.copy(); };
     $('btnDeleteModel').onclick = () => {
       try {
         if (typeof model !== 'undefined' && model && typeof app !== 'undefined' && app) {
@@ -639,91 +641,175 @@ window.addEventListener('DOMContentLoaded',()=>{initPixi();tick();setInterval(ti
     };
   }
 
-  // Keyboard shortcuts for Live2D
-  document.addEventListener('keydown', (e) => {
-    const tag = (e.target && e.target.tagName) || '';
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return;
-    if (e.key === ' ' && typeof model !== 'undefined' && model) {
-      e.preventDefault();
-      // toggle play motion if select has value
-      const sel = $('motionSelect');
-      if (sel && sel.value) $('btnPlay')?.click();
-    } else if (e.key === '0') {
-      $('btnCenter')?.click();
-    } else if (e.key === '+' || e.key === '=') {
-      $('btnZoomIn')?.click();
-    } else if (e.key === '-') {
-      $('btnZoomOut')?.click();
-    }
-  });
+  // Call toolbar once DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { try { ensureBgControls(); } catch (e) {} });
+  } else {
+    try { ensureBgControls(); } catch (e) {}
+  }
+  setTimeout(function () { try { ensureBgControls(); } catch (e) {} }, 600);
+})();
 
-  // Search/filter parameters
-  function ensureParamSearch() {
-    const tab = $('tab-params');
-    if (!tab || $('paramSearch')) return;
-    const row = tab.querySelector('.row') || tab;
-    const input = document.createElement('input');
-    input.id = 'paramSearch';
-    input.type = 'search';
-    input.placeholder = 'Filter parameters…';
-    input.style.cssText = 'width:100%;margin:6px 0;background:#070707;border:1px solid rgba(201,162,39,.3);color:#e6dcc8;border-radius:8px;padding:6px 8px';
-    tab.insertBefore(input, tab.querySelector('.scroll') || tab.firstChild);
-    input.addEventListener('input', () => {
-      const q = input.value.toLowerCase();
-      document.querySelectorAll('#paramList .param-row').forEach((row) => {
-        const id = (row.querySelector('label')?.textContent || '').toLowerCase();
-        row.style.display = !q || id.includes(q) ? '' : 'none';
-      });
+/* Universal view capture — Live2D (PIXI extract) + Media stage */
+(function () {
+  function $(id) { return document.getElementById(id); }
+
+  function mediaVisible() {
+    var stage = $('mediaStage');
+    if (!stage) return false;
+    if (stage.classList.contains('hidden')) return false;
+    if (stage.style.display === 'none') return false;
+    var btn = $('btnModeMedia');
+    if (btn && btn.classList.contains('active-mode')) return true;
+    var img = $('mediaImage'), vid = $('mediaVideo');
+    if (img && img.src && !img.classList.contains('hidden') && img.style.display !== 'none') return true;
+    if (vid && (vid.src || vid.currentSrc) && !vid.classList.contains('hidden')) return true;
+    return false;
+  }
+
+  function grabFromMedia() {
+    var img = $('mediaImage');
+    var vid = $('mediaVideo');
+    var c = document.createElement('canvas');
+    var ctx = c.getContext('2d');
+    if (vid && (vid.src || vid.currentSrc) && !vid.classList.contains('hidden') && vid.style.display !== 'none' && vid.videoWidth > 0) {
+      c.width = vid.videoWidth;
+      c.height = vid.videoHeight;
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(vid, 0, 0);
+      return c;
+    }
+    if (img && img.src && (!img.classList.contains('hidden') || img.style.display === 'block' || img.complete)) {
+      var w = img.naturalWidth || img.width;
+      var h = img.naturalHeight || img.height;
+      if (!w || !h) return null;
+      c.width = w;
+      c.height = h;
+      try {
+        ctx.drawImage(img, 0, 0);
+        return c;
+      } catch (e) {
+        console.error(e);
+        return null;
+      }
+    }
+    return null;
+  }
+
+  function grabFromLive2D() {
+    try {
+      if (typeof app !== 'undefined' && app && app.renderer) {
+        var renderer = app.renderer;
+        var target = (typeof model !== 'undefined' && model) ? model : (app.stage || null);
+        try { renderer.render(app.stage); } catch (_) {}
+        if (renderer.extract) {
+          if (typeof renderer.extract.canvas === 'function') {
+            return renderer.extract.canvas(app.stage);
+          }
+          if (typeof renderer.extract.image === 'function') {
+            var im = renderer.extract.image(app.stage);
+            var c2 = document.createElement('canvas');
+            c2.width = im.width; c2.height = im.height;
+            c2.getContext('2d').drawImage(im, 0, 0);
+            return c2;
+          }
+        }
+        if (renderer.plugins && renderer.plugins.extract && renderer.plugins.extract.canvas) {
+          return renderer.plugins.extract.canvas(app.stage);
+        }
+      }
+    } catch (e) {
+      console.warn('PIXI extract failed', e);
+    }
+    var canvas = $('live2dCanvas');
+    if (canvas && canvas.width > 0) {
+      try {
+        if (typeof app !== 'undefined' && app && app.renderer && app.stage) {
+          app.renderer.render(app.stage);
+        }
+      } catch (_) {}
+      var out = document.createElement('canvas');
+      out.width = canvas.width;
+      out.height = canvas.height;
+      try {
+        out.getContext('2d').drawImage(canvas, 0, 0);
+        return out;
+      } catch (e2) {
+        console.warn(e2);
+      }
+    }
+    return null;
+  }
+
+  function grab() {
+    if (mediaVisible()) {
+      var m = grabFromMedia();
+      if (m && m.width) return m;
+    }
+    return grabFromLive2D();
+  }
+
+  function download() {
+    var c = grab();
+    if (!c || !c.width) {
+      alert('Nothing to capture.\nLoad a Live2D model or open an image/video in Media mode first.');
+      return;
+    }
+    try {
+      var a = document.createElement('a');
+      a.download = 'as-view-' + Date.now() + '.png';
+      a.href = c.toDataURL('image/png');
+      a.click();
+    } catch (e) {
+      alert('Screenshot failed: ' + e.message);
+    }
+  }
+
+  function copy() {
+    var c = grab();
+    if (!c || !c.width) {
+      alert('Nothing to capture.\nLoad a model or media first.');
+      return;
+    }
+    var blobPromise = new Promise(function (res) { c.toBlob(res, 'image/png'); });
+    blobPromise.then(function (blob) {
+      if (!blob) throw new Error('toBlob failed');
+      return navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    }).then(function () {
+      alert('Copied to clipboard');
+    }).catch(function (e) {
+      try {
+        var a = document.createElement('a');
+        a.download = 'as-view-' + Date.now() + '.png';
+        a.href = c.toDataURL('image/png');
+        a.click();
+        alert('Clipboard blocked — PNG downloaded instead');
+      } catch (e2) {
+        alert('Copy failed: ' + (e && e.message ? e.message : e2.message));
+      }
     });
   }
 
-  // Double-click param label to reset to 0/mid
-  document.addEventListener('dblclick', (e) => {
-    const lab = e.target.closest?.('#paramList .param-row label');
-    if (!lab) return;
-    const row = lab.parentElement;
-    const input = row?.querySelector('input[type=range]');
-    if (!input) return;
-    const min = parseFloat(input.min), max = parseFloat(input.max);
-    input.value = (min <= 0 && max >= 0) ? 0 : (min + max) / 2;
-    input.dispatchEvent(new Event('input'));
-  });
+  window.__ASCaptureView = { download: download, copy: copy, grab: grab };
 
-  // Help strip
-  function ensureHelp() {
-    if ($('l2dHelp')) return;
-    const bar = document.querySelector('.status-bar');
-    if (!bar) return;
-    const btn = document.createElement('button');
-    btn.id = 'l2dHelp';
-    btn.className = 'btn sm';
-    btn.style.cssText = 'font-size:0.7rem;padding:2px 8px';
-    btn.textContent = '? Help';
-    btn.onclick = () => {
-      alert(
-        "Live2D Model Suite — Help\\n\\n" +
-        "REQUIRED FILES (from Cubism: File → Export for Runtime):\\n" +
-        "  • Something.model3.json\\n" +
-        "  • Something.moc3\\n" +
-        "  • texture PNGs\\n\\n" +
-        "NOT supported: .cmo3 / .can3 (Editor projects)\\n\\n" +
-        "Shortcuts: Space=play motion, 0=center, +/-=zoom\\n" +
-        "Double-click a parameter name to reset it.\\n" +
-        "Media tab: open Creator PNG/WebM exports."
-      );
-    };
-    bar.appendChild(btn);
-  }
+  document.addEventListener('click', function (e) {
+    var t = e.target && e.target.closest && e.target.closest('#btnScreenshot, #btnCopyView, [data-action="screenshot"], [data-action="copyview"]');
+    if (!t) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (t.id === 'btnCopyView' || t.getAttribute('data-action') === 'copyview') copy();
+    else download();
+  }, true);
 
-  window.addEventListener('DOMContentLoaded', () => {
-    ensureBgControls();
-    ensureParamSearch();
-    ensureHelp();
-  });
-  // Also run if already loaded
-  if (document.readyState !== 'loading') {
-    ensureBgControls();
-    ensureParamSearch();
-    ensureHelp();
+  function bind() {
+    var s = document.getElementById('btnScreenshot');
+    var c = document.getElementById('btnCopyView');
+    if (s) s.onclick = function (e) { e && e.preventDefault(); download(); };
+    if (c) c.onclick = function (e) { e && e.preventDefault(); copy(); };
   }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
+  else bind();
+  setTimeout(bind, 500);
+  setTimeout(bind, 2000);
 })();
