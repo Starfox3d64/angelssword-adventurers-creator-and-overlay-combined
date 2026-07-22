@@ -2430,7 +2430,8 @@ def landing():
             });
           })();
         </script>
-    </body>
+      <script src="/shared/shortcuts.js"></script>
+</body>
     </html>
     """
     return html
