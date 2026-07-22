@@ -17,18 +17,18 @@
 }
 html[data-theme="leaflit"] {
   --as-bg: #0a1020; --as-panel: #121c34; --as-accent: #5b9fff; --as-accent-2: #e23d4f;
-  --as-glow: rgba(91,159,255,.45); --as-text: #e8f0ff; --as-muted: #9bb0d0;
-  --as-border: rgba(91,159,255,.35);
+  --as-glow: rgba(226,61,79,.35); --as-text: #e8f0ff; --as-muted: #9bb0d0;
+  --as-border: rgba(226,61,79,.4);
   --as-tetris-1: #5b9fff; --as-tetris-2: #e23d4f; --as-tetris-3: #f0c14a;
-  --as-tetris-4: #7eb6ff; --as-tetris-5: #c43a4a; --as-tetris-6: #ffe08a; --as-tetris-7: #3d6bb3;
+  --as-tetris-4: #7eb6ff; --as-tetris-5: #c9182e; --as-tetris-6: #ffe08a; --as-tetris-7: #3d6bb3;
   --bg-deep: #0a1020; --bg-panel: #121c34; --bg-panel-alt: #182440; --bg-input: #0c1428;
   --bg-card: rgba(18,28,52,.96);
   --accent-gold: #5b9fff; --accent-gold-soft: #3d7fd4; --accent-gold-glow: rgba(91,159,255,.45);
   --accent-gold-dim: rgba(91,159,255,.16); --accent-teal: #5b9fff; --accent-red: #e23d4f;
-  --accent-rose: #c43a4a; --accent-copper: #f0c14a;
+  --accent-rose: #c9182e; --accent-copper: #f0c14a;
   --text: #e8f0ff; --text-bright: #ffffff; --text-muted: #9bb0d0; --text-dim: #6a7a98;
-  --border: rgba(91,159,255,.2); --border-light: rgba(91,159,255,.3); --border-gold: rgba(91,159,255,.4);
-  --border-gold-med: rgba(91,159,255,.5);
+  --border: rgba(226,61,79,.28); --border-light: rgba(91,159,255,.35); --border-gold: rgba(91,159,255,.4);
+  --border-gold-med: rgba(226,61,79,.5);
 }
 html[data-theme="ooz"] {
   --as-bg: #07141c; --as-panel: #0c1e28; --as-accent: #2ad4e8; --as-accent-2: #ff2d7a;
@@ -61,8 +61,12 @@ html[data-theme="original"] {
   --border-gold-med: rgba(212,175,55,.55);
 }
 
-/* Force body background when themes load after page CSS */
+
+/* Safe theme application — colors only, do not break layout */
 html[data-theme] body {
   background-color: var(--bg-deep, var(--as-bg)) !important;
   color: var(--text, var(--as-text));
+}
+html[data-theme] input[type="range"] {
+  accent-color: var(--accent-gold);
 }

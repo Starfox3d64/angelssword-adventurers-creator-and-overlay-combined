@@ -5,8 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>⚔ Don's Adventurer — Music & Audio Workspace</title>
   <base href="/music/" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="/music/style.css" />
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Outfit:wght@300;400;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/shared/theme.css?v=2"/>
+<script src="/shared/theme-nav.js"></script>
 </head>
 <body>
   <div class="app">
@@ -21,8 +23,11 @@
       <div class="topbar-actions">
         <a class="btn ghost" href="/">🏠 Menu</a>
         <a class="btn ghost" href="/creator">🎨 Creator</a>
-        <a class="btn ghost" href="/live2d">🎭 Models</a>
         <a class="btn ghost" href="/overlay">🎮 Overlay</a>
+        <a class="btn ghost" href="/live2d">🎭 Models</a>
+        <a class="btn ghost" href="/music">🎵 Music</a>
+        <a class="btn ghost" href="/animegen">🌸 AnimeGen</a>
+        <a class="btn ghost" href="/tetris">🧱 Tetris</a>
       </div>
     </header>
 
@@ -121,7 +126,16 @@
     </div>
   </div>
   <script src="/shared/global-player.js"></script>
-  <script src="app.js"></script>
+  <script src="/music/app.js"></script>
 <script src="/shared/theme-nav.js"></script>
+<script src="/shared/notes.js"></script>
+<div id="musicHints" style="position:fixed;left:14px;bottom:72px;z-index:50;max-width:min(380px,92vw);
+  font-size:12px;line-height:1.45;color:var(--as-muted,var(--muted,#9a8b6a));
+  background:color-mix(in srgb, var(--as-panel, #0a0a0a) 94%, transparent);
+  border:1px solid var(--as-border, rgba(201,162,39,.3));border-radius:10px;padding:10px 12px;
+  box-shadow:0 6px 20px rgba(0,0,0,.4)">
+  <button type="button" onclick="this.parentElement.remove()" style="float:right;background:transparent;border:none;color:var(--as-muted);cursor:pointer;font-size:14px;line-height:1" title="Dismiss">✕</button>
+  💡 <b style="color:var(--as-accent,#c9a227)">Global BGM:</b> After generating or loading a track, click <b>Set as Active Global BGM</b>. Playback continues while you use Creator, Models, Overlay, AnimeGen, or Tetris.
+</div>
 </body>
 </html>

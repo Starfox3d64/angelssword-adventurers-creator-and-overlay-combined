@@ -5,8 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>⚔ AS Adventurer — Model & Rigging Suite</title>
   <base href="/live2d/" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="/live2d/style.css?v=7" />
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Outfit:wght@300;400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/shared/theme.css?v=7"/>
+<script src="/shared/theme-nav.js"></script>
 </head>
 <body>
   <div class="app">
@@ -22,10 +24,10 @@
         <a class="btn ghost" href="/">🏠 Menu</a>
         <a class="btn ghost" href="/creator">🎨 Creator</a>
         <a class="btn ghost" href="/overlay">🎮 Overlay</a>
-        <button class="btn" id="btnImport">📂 Import Model</button>
-        <button class="btn" id="btnExportRuntime">💾 Export JSON</button>
-        <button class="btn primary" id="btnExportVTS" title="Zip for VTube Studio / PrprLive">📦 Export VTS / PrprLive</button>
-        <button class="btn" id="btnExportFrames" title="Extract PNG frames from video">🎞 Export Frames</button>
+        <a class="btn ghost" href="/live2d">🎭 Models</a>
+        <a class="btn ghost" href="/music">🎵 Music</a>
+        <a class="btn ghost" href="/animegen">🌸 AnimeGen</a>
+        <a class="btn ghost" href="/tetris">🧱 Tetris</a>
       </div>
     </header>
 
@@ -49,7 +51,10 @@
           Drop Live2D package <strong>or Creator export</strong><br />
           <small>model3.json · PNG · WebM · GIF · MP4 · zip</small>
         </div>
-        <input type="file" id="fileInput" multiple accept=".json,.moc3,.png,.webp,.gif,.webm,.mp4,.mov,.zip,.motion3.json,.physics3.json,.cdi3.json,.cmo3,.can3" hidden />
+        <p id="mediaModeTip" class="small dim" style="margin:8px 10px 4px;line-height:1.45">
+            💡 <b>Media tip:</b> Click <b>🖼 Media</b>, then <b>Open Image / Video</b> — or drag a PNG / WebM / MP4 onto the viewport. Live2D mode needs a runtime <code>.model3.json</code> package.
+          </p>
+          <input type="file" id="fileInput" multiple accept=".json,.moc3,.png,.webp,.gif,.webm,.mp4,.mov,.zip,.motion3.json,.physics3.json,.cdi3.json,.cmo3,.can3" hidden />
         <div class="tree" id="assetTree">
           <div class="tree-empty">Import a Live2D runtime package to inspect parts, motions, and physics.</div>
         </div>
@@ -61,8 +66,8 @@
       <!-- Viewport -->
       <main class="viewport-wrap">
         <div class="viewport-toolbar">
-          <button class="btn sm active-mode" id="btnModeLive2D" title="Live2D model mode">🎭 Live2D</button>
-          <button class="btn sm" id="btnModeMedia" title="Creator media mode">🖼 Media</button>
+          <button class="btn sm active-mode" id="btnModeLive2D" type="button" title="Live2D model mode">🎭 Live2D</button>
+          <button class="btn sm" id="btnModeMedia" type="button" title="Creator media mode">🖼 Media</button>
           <span class="spacer"></span>
 
           <button class="btn sm" id="btnCenter" title="Center model">◎ Center</button>
@@ -80,7 +85,7 @@
           <canvas id="live2dCanvas"></canvas>
           <div id="mediaStage" class="media-stage hidden">
             <img id="mediaImage" alt="sprite" class="hidden" />
-            <video id="mediaVideo" class="hidden" loop playsinline controls></video>
+            <video id="mediaVideo" class="hidden" loop playsinline controls preload="metadata" style="max-width:95%;max-height:95%;display:none"></video></video>
           </div>
           <div id="viewportHint" class="viewport-hint">
             Import a <strong>.model3.json</strong> package to preview.<br />
@@ -133,6 +138,16 @@
         </div>
 
         <div class="tab-body" id="tab-media">
+          <div class="row" style="margin-bottom:10px;gap:8px;flex-wrap:wrap">
+            <input type="file" id="mediaFileInput" accept="image/*,video/*,.png,.jpg,.jpeg,.webp,.gif,.webm,.mp4,.mov" style="display:none" />
+            <button type="button" class="btn primary sm" id="btnMediaPick">📁 Open Image / Video</button>
+            <button type="button" class="btn sm" id="btnMediaPickVideo">🎬 Open Video</button>
+          </div>
+          <p id="mediaTabTip" class="small dim" style="margin:0 0 10px;line-height:1.4">
+            Drag an image/video into the center viewer works too. Use the sliders below for scale, offset, rotation, and opacity.
+          </p>
+
+
           <p class="dim small">For Creator PNG / WebM / GIF exports. Adjust transform and playback.</p>
           <div class="param-row"><label>Scale</label><span class="val" id="mediaScaleVal">1.00</span>
             <input type="range" id="mediaScale" min="0.1" max="3" step="0.01" value="1" /></div>
@@ -172,8 +187,243 @@
   <!-- PIXI + Live2D (CDN — requires network on first load) -->
   <script src="https://cdn.jsdelivr.net/npm/pixi.js@6.5.10/dist/browser/pixi.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/cubism4.min.js"></script>
-  <script src="app.js"></script>
+  
+
+
+
+<script>
+(function () {
+  "use strict";
+  function $(id) { return document.getElementById(id); }
+  function show(el) {
+    if (!el) return;
+    el.classList.remove("hidden");
+    el.style.setProperty("display", el.tagName === "IMG" || el.tagName === "VIDEO" ? "block" : "flex", "important");
+    el.style.setProperty("visibility", "visible", "important");
+    el.style.setProperty("opacity", el.style.opacity || "1", "important");
+  }
+  function hide(el) {
+    if (!el) return;
+    el.classList.add("hidden");
+    el.style.setProperty("display", "none", "important");
+  }
+  function setMediaMode(on) {
+    var liveBtn = $("btnModeLive2D"), medBtn = $("btnModeMedia");
+    var canvas = $("live2dCanvas"), stage = $("mediaStage"), hint = $("viewportHint");
+    if (liveBtn) liveBtn.classList.toggle("active-mode", !on);
+    if (medBtn) medBtn.classList.toggle("active-mode", !!on);
+    if (on) {
+      if (canvas) {
+        canvas.style.setProperty("display", "none", "important");
+        canvas.style.setProperty("visibility", "hidden", "important");
+      }
+      show(stage);
+      if (stage) {
+        stage.style.setProperty("z-index", "10", "important");
+        stage.style.setProperty("position", "absolute", "important");
+        stage.style.setProperty("inset", "0", "important");
+        stage.style.setProperty("background", "#0a0a0a", "important");
+      }
+      document.querySelectorAll(".tab").forEach(function (t) { t.classList.remove("active"); });
+      document.querySelectorAll(".tab-body").forEach(function (b) { b.classList.remove("active"); });
+      var tab = document.querySelector('.tab[data-tab="media"]');
+      if (tab) tab.classList.add("active");
+      var body = $("tab-media");
+      if (body) body.classList.add("active");
+    } else {
+      if (canvas) {
+        canvas.style.setProperty("display", "block", "important");
+        canvas.style.setProperty("visibility", "visible", "important");
+      }
+      hide(stage);
+      hide($("mediaImage"));
+      hide($("mediaVideo"));
+    }
+  }
+  function applyTweak() {
+    var scale = parseFloat(($("mediaScale") && $("mediaScale").value) || 1);
+    var x = parseFloat(($("mediaX") && $("mediaX").value) || 0);
+    var y = parseFloat(($("mediaY") && $("mediaY").value) || 0);
+    var rot = parseFloat(($("mediaRot") && $("mediaRot").value) || 0);
+    var op = parseFloat(($("mediaOp") && $("mediaOp").value) || 1);
+    if ($("mediaScaleVal")) $("mediaScaleVal").textContent = scale.toFixed(2);
+    if ($("mediaXVal")) $("mediaXVal").textContent = String(Math.round(x));
+    if ($("mediaYVal")) $("mediaYVal").textContent = String(Math.round(y));
+    if ($("mediaRotVal")) $("mediaRotVal").textContent = Math.round(rot) + "°";
+    if ($("mediaOpVal")) $("mediaOpVal").textContent = Math.round(op * 100) + "%";
+    var t = "translate(" + x + "px," + y + "px) rotate(" + rot + "deg) scale(" + scale + ")";
+    ["mediaImage", "mediaVideo"].forEach(function (id) {
+      var el = $(id);
+      if (!el) return;
+      el.style.transformOrigin = "center center";
+      el.style.transform = t;
+      // don't force opacity via setProperty important over slider — use style.opacity
+      el.style.opacity = String(op);
+    });
+  }
+  function showFile(file) {
+    if (!file) { alert("No file"); return; }
+    var low = (file.name || "").toLowerCase();
+    var type = file.type || "";
+    var isVid = type.indexOf("video/") === 0 || /\.(webm|mp4|mov|mkv|m4v)$/i.test(low);
+    var isImg = type.indexOf("image/") === 0 || /\.(png|jpe?g|webp|gif|bmp)$/i.test(low);
+    if (!isVid && !isImg) {
+      alert("Unsupported: " + (file.name || type || "file"));
+      return;
+    }
+    setMediaMode(true);
+    var url = URL.createObjectURL(file);
+    var img = $("mediaImage"), vid = $("mediaVideo"), hint = $("viewportHint"), stage = $("mediaStage");
+    if (hint) hide(hint);
+    show(stage);
+    if (isVid) {
+      hide(img);
+      if (vid) {
+        show(vid);
+        vid.controls = true;
+        vid.muted = true; // help autoplay
+        vid.playsInline = true;
+        vid.src = url;
+        vid.load();
+        vid.play().catch(function () {});
+      }
+    } else {
+      if (vid) { try { vid.pause(); } catch (e) {} vid.removeAttribute("src"); hide(vid); }
+      if (img) {
+        show(img);
+        img.onload = function () {
+          show(stage);
+          show(img);
+          applyTweak();
+        };
+        img.src = url;
+      }
+    }
+    applyTweak();
+    if ($("stModel")) $("stModel").textContent = (isVid ? "Video: " : "Image: ") + (file.name || "file");
+  }
+  
+  function pick(accept) {
+    // Fresh input every time — avoids sticky/cleared onchange bugs
+    var fi = document.createElement("input");
+    fi.type = "file";
+    fi.accept = accept || "image/*,video/*,.png,.jpg,.jpeg,.webp,.gif,.webm,.mp4,.mov,.m4v";
+    fi.style.position = "fixed";
+    fi.style.left = "-9999px";
+    fi.style.top = "0";
+    fi.multiple = false;
+    fi.addEventListener("change", function onPick() {
+      fi.removeEventListener("change", onPick);
+      var file = fi.files && fi.files[0];
+      try { document.body.removeChild(fi); } catch (e) {}
+      if (!file) return;
+      showFile(file);
+      // Also try to persist into library (best-effort)
+      try {
+        var fd = new FormData();
+        fd.append("file", file);
+        fetch("/api/live2d/media/upload", { method: "POST", body: fd }).then(function (r) {
+          return r.json();
+        }).then(function () {
+          // silent refresh if library open
+        }).catch(function () {});
+      } catch (e) {}
+    });
+    document.body.appendChild(fi);
+    // Defer click so the element is in the DOM
+    setTimeout(function () { fi.click(); }, 0);
+  }
+
+  function wire() {
+    if ($("btnModeLive2D")) $("btnModeLive2D").onclick = function (e) { e.preventDefault(); setMediaMode(false); };
+    if ($("btnModeMedia")) $("btnModeMedia").onclick = function (e) { e.preventDefault(); setMediaMode(true); };
+    if ($("btnMediaPick")) $("btnMediaPick").onclick = function (e) { e.preventDefault(); e.stopPropagation(); pick(); };
+    if ($("btnMediaPickVideo")) $("btnMediaPickVideo").onclick = function (e) { e.preventDefault(); e.stopPropagation(); pick("video/*,.webm,.mp4,.mov,.m4v"); };
+    // Dropzone click → file picker for media (in addition to Live2D package import)
+    var dz = $("dropzone");
+    if (dz && !dz.dataset.mediaClickBound) {
+      dz.dataset.mediaClickBound = "1";
+      dz.addEventListener("click", function (e) {
+        // If user is in media mode, open media picker; otherwise leave to app.js Live2D import
+        var med = $("btnModeMedia");
+        if (med && med.classList.contains("active-mode")) {
+          e.preventDefault();
+          e.stopPropagation();
+          pick();
+        }
+      }, true);
+    }
+    if ($("btnMediaPickVideo")) $("btnMediaPickVideo").onclick = function (e) { e.preventDefault(); pick("video/*,.webm,.mp4,.mov"); };
+    if ($("btnImportMedia")) $("btnImportMedia").onclick = function (e) { e.preventDefault(); pick(); };
+    if ($("mediaPlay")) $("mediaPlay").onclick = function () { var v = $("mediaVideo"); if (v) { v.muted = false; v.play().catch(function(){}); } };
+    if ($("mediaPause")) $("mediaPause").onclick = function () { var v = $("mediaVideo"); if (v) v.pause(); };
+    if ($("mediaResetTweak")) $("mediaResetTweak").onclick = function () {
+      [["mediaScale",1],["mediaX",0],["mediaY",0],["mediaRot",0],["mediaOp",1]].forEach(function (p) {
+        if ($(p[0])) $(p[0]).value = p[1];
+      });
+      applyTweak();
+    };
+    ["mediaScale","mediaX","mediaY","mediaRot","mediaOp"].forEach(function (id) {
+      var el = $(id); if (!el) return; el.oninput = applyTweak; el.onchange = applyTweak;
+    });
+    if ($("btnLoadCreatorMedia")) $("btnLoadCreatorMedia").onclick = function (e) {
+      e.preventDefault();
+      var host = $("mediaLibrary");
+      if (!host) return;
+      host.innerHTML = "Loading…";
+      fetch("/api/live2d/media").then(function (r) { return r.json(); }).then(function (data) {
+        var list = data.media || [];
+        if (!list.length) { host.innerHTML = "<div class='dim'>Empty library — use Open Image/Video</div>"; return; }
+        host.innerHTML = list.map(function (m) {
+          return '<div class="media-lib-item" data-url="'+m.url+'" data-type="'+(m.type||'')+'" style="cursor:pointer;padding:6px;margin:4px 0;border:1px solid var(--border);border-radius:6px">'+(m.type==="video"?"🎬 ":"🖼 ")+(m.name||m.url)+"</div>";
+        }).join("");
+        host.querySelectorAll(".media-lib-item").forEach(function (el) {
+          el.onclick = function () {
+            setMediaMode(true);
+            var url = el.getAttribute("data-url");
+            var isVid = el.getAttribute("data-type")==="video" || /\.(webm|mp4|mov)/i.test(url);
+            var img = $("mediaImage"), vid = $("mediaVideo"), hint = $("viewportHint"), stage = $("mediaStage");
+            if (hint) hide(hint);
+            show(stage);
+            if (isVid) {
+              hide(img); show(vid); vid.src = url; vid.load(); vid.play().catch(function(){});
+            } else {
+              hide(vid); show(img); img.src = url;
+            }
+            applyTweak();
+          };
+        });
+      }).catch(function (err) { host.innerHTML = "Error: " + err.message; });
+    };
+    function onDrop(e) {
+      var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (!f) return;
+      var low = (f.name||"").toLowerCase(), type = f.type||"";
+      if (type.indexOf("image/")===0 || type.indexOf("video/")===0 || /\.(png|jpe?g|webp|gif|webm|mp4|mov)$/i.test(low)) {
+        e.preventDefault(); e.stopPropagation(); showFile(f);
+      }
+    }
+    ["dropzone","viewport","mediaStage"].forEach(function (id) {
+      var el = $(id); if (!el) return;
+      el.addEventListener("dragover", function (e) { e.preventDefault(); });
+      el.addEventListener("drop", onDrop, true);
+    });
+    if ($("mediaFileInput")) $("mediaFileInput").onchange = function () {
+      var fi = $("mediaFileInput"); if (fi.files && fi.files[0]) showFile(fi.files[0]);
+    };
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wire);
+  else wire();
+  window.__ASMediaQuick = { setMediaMode: setMediaMode, showFile: showFile, pick: pick, applyTweak: applyTweak };
+})();
+</script>
+
+
+
+
+  <script src="/live2d/app.js?v=14"></script>
 <script src="/shared/global-player.js"></script>
 <script src="/shared/theme-nav.js"></script>
+<script src="/shared/notes.js"></script>
 </body>
 </html>

@@ -6,14 +6,53 @@ document.querySelectorAll(".tab").forEach(tab=>{tab.onclick=()=>{document.queryS
 let app,model,modelJson,files=new Map(),scale=1;
 function initPixi(){if(!window.PIXI){ $("viewportHint").innerHTML="PIXI CDN failed to load.";return;} const host=$("viewport"); app=new PIXI.Application({view:$("live2dCanvas"),resizeTo:host,backgroundAlpha:0,antialias:true}); let drag=false,lx=0,ly=0; host.onpointerdown=e=>{drag=true;lx=e.clientX;ly=e.clientY;}; window.onpointerup=()=>drag=false; host.onpointermove=e=>{if(!drag||!model)return;model.x+=e.clientX-lx;model.y+=e.clientY-ly;lx=e.clientX;ly=e.clientY;}; host.addEventListener("wheel",e=>{e.preventDefault();if(!model)return;scale*=e.deltaY>0?0.92:1.08;model.scale.set(scale);},{passive:false});}
 async function ingestFiles(list){
+  const mediaExt=/\.(png|jpe?g|webp|gif|webm|mp4|mov)$/i;
+  let loadedMedia=false;
   for(const f of [...list]){
     const name=(f.webkitRelativePath||f.name);
     const low=name.toLowerCase();
-    if(low.endsWith('.cmo3')||low.endsWith('.can3')){alert(name+' is a Cubism EDITOR project (.cmo3), not a runtime model.\n\nIn Cubism Editor: File → Export for Runtime\nThen load the folder with .model3.json + .moc3 + texture PNGs.\n\n.cmo3 will never open in this viewer.');continue;}
+    if(low.endsWith('.cmo3')||low.endsWith('.can3')){
+      alert(name+' is a Cubism EDITOR project, not a runtime model.\nUse File → Export for Runtime in Cubism.');
+      continue;
+    }
     if(low.endsWith('.zip')){await ingestZip(f);continue;}
-    files.set(name.split(/[/\\]/).pop(),f); files.set(name,f);
+    if(mediaExt.test(low)){
+      // Always open media via blob — do not depend on other modules
+      try{
+        if(window.__ASLive2DMedia&&window.__ASLive2DMedia.openFile){
+          await window.__ASLive2DMedia.openFile(f);
+        }else{
+          // Inline fallback
+          const url=URL.createObjectURL(f);
+          const isVid=/\.(webm|mp4|mov)$/i.test(low);
+          const img=document.getElementById('mediaImage');
+          const vid=document.getElementById('mediaVideo');
+          const stage=document.getElementById('mediaStage');
+          const canvas=document.getElementById('live2dCanvas');
+          const hint=document.getElementById('viewportHint');
+          document.getElementById('btnModeMedia')?.classList.add('active-mode');
+          document.getElementById('btnModeLive2D')?.classList.remove('active-mode');
+          if(canvas) canvas.style.display='none';
+          if(stage){stage.classList.remove('hidden');}
+          if(hint) hint.style.display='none';
+          if(isVid){
+            if(img) img.classList.add('hidden');
+            if(vid){vid.classList.remove('hidden');vid.src=url;vid.play().catch(()=>{});}
+          }else{
+            if(vid){vid.pause();vid.removeAttribute('src');vid.classList.add('hidden');}
+            if(img){img.classList.remove('hidden');img.src=url;}
+          }
+          const st=document.getElementById('stModel');
+          if(st) st.textContent='Media: '+name;
+        }
+        loadedMedia=true;
+      }catch(err){console.error('media open',err);alert('Could not open media: '+err.message);}
+      continue;
+    }
+    files.set(name.split(/[/\\]/).pop(),f);
+    files.set(name,f);
   }
-  await autoLoad();
+  if(!loadedMedia) await autoLoad();
 }
 async function ingestZip(file){
   try{
@@ -218,18 +257,26 @@ window.addEventListener('DOMContentLoaded',()=>{initPixi();tick();setInterval(ti
   function setMode(mode){
     mediaState.mode = mode;
     const live = mode === 'live2d';
-    $('btnModeLive2D')?.classList.toggle('active-mode', live);
-    $('btnModeMedia')?.classList.toggle('active-mode', !live);
-    $('live2dCanvas').style.display = live ? 'block' : 'none';
-    const stage = $('mediaStage');
-    if (stage) {
-      stage.classList.toggle('hidden', live);
-    }
-    if (!live) {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.tab-body').forEach(b => b.classList.remove('active'));
-      document.querySelector('.tab[data-tab="media"]')?.classList.add('active');
-      $('tab-media')?.classList.add('active');
+    try {
+      $('btnModeLive2D')?.classList.toggle('active-mode', live);
+      $('btnModeMedia')?.classList.toggle('active-mode', !live);
+      const canvas = $('live2dCanvas');
+      if (canvas) canvas.style.display = live ? 'block' : 'none';
+      const stage = $('mediaStage');
+      if (stage) {
+        stage.classList.toggle('hidden', live);
+        if (!live) stage.classList.remove('hidden');
+      }
+      const hint = $('viewportHint');
+      if (hint && !live && mediaState.url) hint.style.display = 'none';
+      if (!live) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-body').forEach(b => b.classList.remove('active'));
+        document.querySelector('.tab[data-tab="media"]')?.classList.add('active');
+        $('tab-media')?.classList.add('active');
+      }
+    } catch (err) {
+      console.error('setMode', err);
     }
   }
 
@@ -256,6 +303,10 @@ window.addEventListener('DOMContentLoaded',()=>{initPixi();tick();setInterval(ti
   function showMedia(url, kind, label){
     setMode('media');
     mediaState.url = url; mediaState.kind = kind;
+    const stage = $('mediaStage');
+    if (stage) stage.classList.remove('hidden');
+    const canvas = $('live2dCanvas');
+    if (canvas) canvas.style.display = 'none';
     const img = $('mediaImage'), vid = $('mediaVideo');
     if (kind === 'video' || kind === 'gif' && url.toLowerCase().endsWith('.gif') === false) {
       /* gif as img is better for scrub-less; webm/mp4 as video */
@@ -283,20 +334,19 @@ window.addEventListener('DOMContentLoaded',()=>{initPixi();tick();setInterval(ti
     const low = name.toLowerCase();
     const isMedia = /\.(png|webp|jpe?g|gif|webm|mp4|mov)$/i.test(low);
     if (!isMedia) return false;
-    // Upload to library so it persists
+    let url = null;
     try {
       const fd = new FormData(); fd.append('file', file);
       const res = await fetch('/api/live2d/media/upload', { method: 'POST', body: fd });
-      const data = await res.json();
-      if (res.ok && data.url) {
-        showMedia(data.url, data.url.match(/\.(webm|mp4|mov)/i) ? 'video' : 'image', data.name);
-        refreshMediaLibrary();
-        return true;
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.url) url = data.url;
       }
-    } catch (_) {}
-    // Fallback blob URL
-    const url = URL.createObjectURL(file);
-    showMedia(url, /\.(webm|mp4|mov)$/i.test(low) ? 'video' : 'image', name);
+    } catch (e) { console.warn('media upload', e); }
+    if (!url) url = URL.createObjectURL(file);
+    const kind = /\.(webm|mp4|mov)$/i.test(low) ? 'video' : 'image';
+    showMedia(url, kind, name);
+    try { refreshMediaLibrary(); } catch (_) {}
     return true;
   }
 
@@ -324,10 +374,32 @@ window.addEventListener('DOMContentLoaded',()=>{initPixi();tick();setInterval(ti
     }
   }
 
+  window.__ASLive2DMedia = {
+    setMode: setMode,
+    openFile: openMediaFile,
+    refresh: refreshMediaLibrary,
+    show: showMedia
+  };
+
+  function bindModeButtons() {
+    var a = document.getElementById('btnModeLive2D');
+    var b = document.getElementById('btnModeMedia');
+    if (a) a.onclick = function () { setMode('live2d'); };
+    if (b) b.onclick = function () { setMode('media'); refreshMediaLibrary(); };
+  }
+  bindModeButtons();
+  var bim = document.getElementById('btnImportMedia');
+  if (bim) bim.onclick = function(){
+    var fi = document.getElementById('fileInput');
+    if (fi) { fi.accept = 'image/*,video/*,.png,.webp,.jpg,.jpeg,.gif,.webm,.mp4,.mov'; fi.click(); }
+  };
+
+
   // Hook into existing drop/ingest: try media first
   const _ingestFiles = window.ingestFiles;
   // Patch dropzone after DOM ready
   window.addEventListener('DOMContentLoaded', () => {
+    bindModeButtons();
     $('btnModeLive2D')?.addEventListener('click', () => setMode('live2d'));
     $('btnModeMedia')?.addEventListener('click', () => { setMode('media'); refreshMediaLibrary(); });
     ['mediaScale','mediaX','mediaY','mediaRot','mediaOp'].forEach(id => {

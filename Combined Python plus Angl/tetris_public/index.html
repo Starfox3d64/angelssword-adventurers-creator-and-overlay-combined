@@ -4,41 +4,77 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Tetris — Don's Adventurer</title>
-<link rel="stylesheet" href="/shared/theme.css?v=2"/>
+<link rel="stylesheet" href="/shared/theme.css?v=7"/>
 <script src="/shared/theme-nav.js"></script>
 <style>
-  body{margin:0;background:var(--as-bg,#030303);color:var(--as-text,#e6dcc8);font-family:system-ui,sans-serif;min-height:100vh}
-  .wrap{max-width:640px;margin:24px auto;padding:16px}
-  h1{color:var(--as-accent,#c9a227);margin:0 0 4px;text-align:center}
-  .sub{color:var(--as-muted);font-size:.85rem;text-align:center;margin-bottom:16px}
+  body{margin:0;background:var(--as-bg,var(--bg-deep,#030303));color:var(--as-text,#e6dcc8);font-family:system-ui,sans-serif;min-height:100vh}
+  .topnav{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;padding:10px 12px;border-bottom:1px solid var(--as-border);background:var(--as-panel,#0a0a0a)}
+  .topnav a{color:var(--as-accent);text-decoration:none;border:1px solid var(--as-border);border-radius:8px;padding:5px 10px;font-size:.82rem}
+  .topnav a:hover{background:var(--as-accent-2);color:#fff}
+  .topnav .clock{margin-left:auto;color:var(--as-muted);font-size:.85rem;font-variant-numeric:tabular-nums;padding:0 8px}
+  .wrap{max-width:720px;margin:20px auto;padding:16px}
+  h1{color:var(--as-accent);margin:0 0 4px;text-align:center}
+  .sub{color:var(--as-muted);font-size:.82rem;text-align:center;margin-bottom:12px}
   .game{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;align-items:flex-start}
   canvas#c{background:#0a0a0a;border:2px solid var(--as-border);border-radius:10px}
-  .side{min-width:140px}
-  .side .box{background:var(--as-panel,#0a0a0a);border:1px solid var(--as-border);border-radius:10px;padding:12px;margin-bottom:10px}
-  .side h3{margin:0 0 8px;font-size:.85rem;color:var(--as-muted)}
-  #next{display:block;margin:0 auto;background:#0a0a0a;border-radius:6px}
-  .stat{font-size:1.2rem;color:var(--as-accent);font-weight:700}
-  .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px}
-  button,.link{
+  .side{min-width:150px;max-width:180px}
+  .side .box{background:var(--as-panel);border:1px solid var(--as-border);border-radius:10px;padding:10px;margin-bottom:8px}
+  .side h3{margin:0 0 6px;font-size:.78rem;color:var(--as-muted);text-transform:uppercase;letter-spacing:.04em}
+  .stat{font-size:1.15rem;color:var(--as-accent);font-weight:700}
+  .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+  button,.link,select{
     background:var(--as-panel);color:var(--as-accent);border:1px solid var(--as-border);
-    border-radius:8px;padding:10px 16px;cursor:pointer;font-size:.95rem;text-decoration:none
+    border-radius:8px;padding:8px 12px;cursor:pointer;font-size:.9rem;text-decoration:none
   }
   button:hover,.link:hover{background:var(--as-accent-2);color:#fff}
-  kbd{background:var(--as-panel);border:1px solid var(--as-border);border-radius:4px;padding:1px 5px;font-size:.75rem}
+  button.active{border-color:var(--as-accent);box-shadow:0 0 0 1px var(--as-accent)}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:12px 0;align-items:center}
+  .controls label{font-size:.8rem;color:var(--as-muted)}
+  input[type=range]{accent-color:var(--as-accent);width:140px}
+  .chk{display:inline-flex;align-items:center;gap:6px;font-size:.82rem;color:var(--as-text)}
+  kbd{background:var(--as-panel);border:1px solid var(--as-border);border-radius:4px;padding:1px 5px;font-size:.72rem}
 </style>
 </head>
 <body>
+<nav class="topnav">
+  <a href="/">🏠 Menu</a>
+  <a href="/creator">🎨 Creator</a>
+  <a href="/overlay">🎮 Overlay</a>
+  <a href="/live2d">🎭 Models</a>
+  <a href="/music">🎵 Music</a>
+  <a href="/animegen">🌸 AnimeGen</a>
+  <a href="/tetris">🧱 Tetris</a>
+  <span class="clock" id="worldClock">--:--:--</span>
+</nav>
 <div class="wrap">
   <h1>🧱 Tetris</h1>
-  <div class="sub">← → move · ↑ rotate · ↓ soft drop · Space hard drop · P pause</div>
+  <div class="sub">← → move · ↑/X rotate · ↓ soft · Space hard · C hold · P pause · R restart</div>
+
+  <div class="controls">
+    <span style="color:var(--as-muted);font-size:.8rem">Difficulty:</span>
+    <button type="button" data-diff="easy">Easy</button>
+    <button type="button" data-diff="normal" class="active">Normal</button>
+    <button type="button" data-diff="hard">Hard</button>
+    <button type="button" data-diff="insane">Insane</button>
+  </div>
+  <div class="controls">
+    <label for="speed">Drop speed (ms)</label>
+    <input type="range" id="speed" min="40" max="900" step="10" value="550" title="Move to override auto speed from difficulty" />
+    <span id="dropMs" style="color:var(--as-accent);font-size:.85rem;min-width:4rem">—</span>
+    <label class="chk"><input type="checkbox" id="ghostToggle" checked /> Ghost piece</label>
+  </div>
+
   <div class="game">
     <canvas id="c" width="240" height="480"></canvas>
     <div class="side">
+      <div class="box"><h3>Hold <kbd>C</kbd></h3><canvas id="hold" width="90" height="90"></canvas></div>
       <div class="box"><h3>Next</h3><canvas id="next" width="90" height="90"></canvas></div>
       <div class="box"><h3>Score</h3><div class="stat" id="score">0</div></div>
+      <div class="box"><h3>High Score</h3><div class="stat" id="hiscore">0</div></div>
       <div class="box"><h3>Lines</h3><div class="stat" id="lines">0</div></div>
       <div class="box"><h3>Level</h3><div class="stat" id="level">1</div></div>
       <div class="box"><h3>Status</h3><div id="status">Ready</div></div>
+      <div class="box"><h3>Difficulty</h3><div id="diffLabel">Normal</div></div>
     </div>
   </div>
   <div class="row">
@@ -47,7 +83,18 @@
     <a class="link" href="/">← Main Menu</a>
   </div>
 </div>
+<script>
+(function(){
+  function tick(){
+    var el=document.getElementById('worldClock');
+    if(!el) return;
+    el.textContent=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  }
+  tick(); setInterval(tick,1000);
+})();
+</script>
 <script src="/shared/global-player.js"></script>
+<script src="/shared/notes.js"></script>
 <script src="/tetris/tetris.js"></script>
 </body>
 </html>

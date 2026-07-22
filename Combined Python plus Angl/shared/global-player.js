@@ -98,23 +98,81 @@
     return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
   }
 
+
   function ensureUI() {
     if (document.getElementById('asGlobalAudioBar')) return;
+    // Remove any stray duplicate players
+    document.querySelectorAll('[data-as-audio-legacy]').forEach(function (el) { el.remove(); });
     const bar = document.createElement('div');
     bar.id = 'asGlobalAudioBar';
     bar.innerHTML = `
-      <style>
-        #asGlobalAudioBar{position:fixed;left:12px;right:12px;bottom:12px;z-index:99999;
-          display:flex;gap:10px;align-items:center;flex-wrap:wrap;
-          background:linear-gradient(135deg,#0c0c0c,#1a0a0c);border:1px solid rgba(201,162,39,.4);
-          border-radius:12px;padding:8px 12px;box-shadow:0 8px 32px rgba(0,0,0,.6);
-          font-family:system-ui,sans-serif;color:#e6dcc8;font-size:13px}
-        #asGlobalAudioBar button{background:#0a0a0a;border:1px solid rgba(201,162,39,.35);
-          color:#c9a227;border-radius:8px;padding:4px 10px;cursor:pointer}
-        #asGlobalAudioBar button:hover{background:rgba(139,41,66,.35)}
-        #asGlobalAudioBar .title{flex:1;min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#c9a227}
-        #asGlobalAudioBar input[type=range]{width:100px}
-        #asGlobalAudioBar.collapsed .extra{display:none}
+      <style id="asGlobalAudioBarStyle">
+        #asGlobalAudioBar {
+          position: fixed;
+          left: 16px;
+          right: 16px;
+          bottom: 14px;
+          z-index: 99999;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 8px 14px;
+          border-radius: 14px;
+          max-width: 920px;
+          margin: 0 auto;
+          background: color-mix(in srgb, var(--bg-panel, #0a0a0a) 92%, transparent);
+          border: 1px solid var(--border-gold, var(--as-border, rgba(201,162,39,.35)));
+          box-shadow: 0 10px 40px rgba(0,0,0,.55);
+          font-family: system-ui, sans-serif;
+          color: var(--text, var(--as-text, #e6dcc8));
+          font-size: 13px;
+          backdrop-filter: blur(10px);
+        }
+        #asGlobalAudioBar button {
+          background: var(--bg-deep, #050505);
+          border: 1px solid var(--border-gold, var(--as-border, rgba(201,162,39,.3)));
+          color: var(--accent-gold, var(--as-accent, #c9a227));
+          border-radius: 8px;
+          padding: 5px 10px;
+          cursor: pointer;
+          line-height: 1;
+        }
+        #asGlobalAudioBar button:hover {
+          background: var(--accent-red, var(--as-accent-2, #8b2942));
+          color: #fff;
+        }
+        #asGlobalAudioBar .title {
+          flex: 1;
+          min-width: 100px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          color: var(--accent-gold, var(--as-accent, #c9a227));
+          font-weight: 600;
+        }
+        #asGlobalAudioBar .extra { color: var(--text-muted, var(--as-muted, #9a8b6a)); font-size: 12px; }
+        #asGlobalAudioBar input[type=range] {
+          accent-color: var(--accent-gold, var(--as-accent, #c9a227));
+          width: 90px;
+        }
+        #asGlobalAudioBar input#asGapScrub { flex: 1; min-width: 80px; max-width: 220px; }
+        #asGlobalAudioBar a {
+          color: var(--accent-gold, var(--as-accent, #c9a227)) !important;
+          text-decoration: none;
+          font-size: 12px;
+          border: 1px solid var(--border-gold, var(--as-border, rgba(201,162,39,.3)));
+          border-radius: 8px;
+          padding: 4px 8px;
+        }
+        #asGlobalAudioBar.collapsed {
+          width: auto;
+          right: auto;
+          max-width: none;
+        }
+        #asGlobalAudioBar.collapsed .extra,
+        #asGlobalAudioBar.collapsed #asGapScrub,
+        #asGlobalAudioBar.collapsed #asGapVol,
+        #asGlobalAudioBar.collapsed #asGapOpenMusic { display: none; }
       </style>
       <button type="button" id="asGapPlay" title="Play/Pause">▶</button>
       <button type="button" id="asGapStop" title="Stop">⏹</button>
@@ -123,10 +181,11 @@
       <input type="range" id="asGapScrub" class="extra" min="0" max="1000" value="0" title="Seek" />
       <input type="range" id="asGapVol" min="0" max="1" step="0.01" value="0.8" title="Volume" />
       <button type="button" id="asGapMute" title="Mute">🔇</button>
-      <a href="/music" id="asGapOpenMusic" title="Open Music Workspace" style="color:#c9a227;text-decoration:none;font-size:12px">Music</a>
+      <a href="/music" id="asGapOpenMusic" title="Open Music Workspace">Music</a>
       <button type="button" id="asGapHide" title="Minimize">▾</button>
     `;
     document.body.appendChild(bar);
+
     $('asGapPlay').onclick = () => {
       if (audio.paused) {
         if (!audio.src && loadState().url) audio.src = loadState().url;
@@ -197,6 +256,11 @@
     updateUI();
   });
 
+  window.addEventListener('as-theme-change', function () {
+      // CSS variables already update; force repaint
+      var bar = document.getElementById('asGlobalAudioBar');
+      if (bar) { bar.style.display = 'none'; bar.offsetHeight; bar.style.display = ''; }
+    });
   window.__ASGlobalAudio = api;
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => { ensureUI(); resumeIfNeeded(); });

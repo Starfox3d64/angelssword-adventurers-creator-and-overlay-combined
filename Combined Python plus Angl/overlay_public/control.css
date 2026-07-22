@@ -1,3 +1,12 @@
+:root {
+  --ov-bg: var(--bg-deep, var(--as-bg, var(--ov-bg)));
+  --ov-panel: var(--bg-panel, var(--as-panel, var(--ov-panel)));
+  --ov-gold: var(--accent-gold, var(--as-accent, var(--ov-gold)));
+  --ov-rose: var(--accent-red, var(--as-accent-2, var(--ov-rose)));
+  --ov-text: var(--text, var(--as-text, var(--ov-text)));
+  --ov-muted: var(--text-muted, var(--as-muted, var(--ov-muted)));
+  --ov-border: var(--border-gold, var(--as-border, color-mix(in srgb, var(--ov-gold) 30%, transparent)));
+}
 /* ═══════════════════════════════════════════════════
    AS Adventurer — Control Panel Styles
    Angel's Sword Studios
@@ -5,24 +14,24 @@
 
 :root {
   /* Backgrounds — black & gold */
-  --bg-primary: #030303;
+  --bg-primary: var(--ov-bg);
   --bg-card: rgba(12, 12, 12, 0.95);
   --bg-card-hover: #141414;
-  --bg-input: #0a0a0a;
-  --border: rgba(201, 162, 39, 0.15);
-  --border-focus: #c9a227;
+  --bg-input: var(--ov-panel);
+  --border: color-mix(in srgb, var(--ov-gold) 15%, transparent);
+  --border-focus: var(--ov-gold);
 
   /* Text */
-  --text-primary: #e6dcc8;
-  --text-secondary: #9a8b6a;
+  --text-primary: var(--ov-text);
+  --text-secondary: var(--ov-muted);
   --text-muted: #5c5648;
 
   /* Accent — refined gold */
-  --accent: #c9a227;
+  --accent: var(--ov-gold);
   --accent-hover: #f0d878;
-  --accent-glow: rgba(201, 162, 39, 0.35);
-  --accent-blue: #1a1a1a;
-  --accent-teal: #c9a227;
+  --accent-glow: color-mix(in srgb, var(--ov-gold) 35%, transparent);
+  --accent-blue: var(--ov-panel);
+  --accent-teal: var(--ov-gold);
 
   /* Status */
   --success: #6bcb77;
@@ -32,7 +41,7 @@
   /* Expression meters */
   --meter-smile: #7b9f6e;
   --meter-frown: #5bb5a6;
-  --meter-surprised: #dbb858;
+  --meter-surprised: var(--ov-gold);
   --meter-eyes: #c084fc;
 
   /* Layout */
@@ -790,17 +799,17 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 /* BLACK GOLD OVERLAY POLISH */
 body, html {
-  background: #030303 !important;
+  background: var(--ov-bg) !important;
 }
 .header {
-  border-bottom: 1px solid rgba(201, 162, 39, 0.25) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--ov-gold) 25%, transparent) !important;
 }
 .card, .panel, .section {
   background: rgba(12,12,12,0.95) !important;
-  border: 1px solid rgba(201, 162, 39, 0.18) !important;
+  border: 1px solid color-mix(in srgb, var(--ov-gold) 18%, transparent) !important;
 }
 button.primary, .btn-primary, .emote-btn:hover {
-  border-color: #c9a227 !important;
+  border-color: var(--ov-gold) !important;
 }
 .overlay-qol-bar {
   display: flex;
@@ -809,39 +818,39 @@ button.primary, .btn-primary, .emote-btn:hover {
   align-items: center;
   padding: 10px 0 16px;
   margin-bottom: 8px;
-  border-bottom: 1px solid rgba(201, 162, 39, 0.15);
+  border-bottom: 1px solid color-mix(in srgb, var(--ov-gold) 15%, transparent);
 }
 .overlay-qol-bar a, .overlay-qol-bar button {
   font-size: 0.8rem;
   padding: 6px 12px;
   border-radius: 8px;
-  border: 1px solid rgba(201, 162, 39, 0.3);
-  background: #0a0a0a;
-  color: #c9a227;
+  border: 1px solid color-mix(in srgb, var(--ov-gold) 30%, transparent);
+  background: var(--ov-panel);
+  color: var(--ov-gold);
   text-decoration: none;
   cursor: pointer;
 }
 .overlay-qol-bar a:hover, .overlay-qol-bar button:hover {
-  background: rgba(201, 162, 39, 0.15);
+  background: color-mix(in srgb, var(--ov-gold) 15%, transparent);
 }
 
 
 /* DON SHEET OVERLAY */
-body, html { background: #030303 !important; }
-.header { border-bottom: 1px solid rgba(201, 162, 39, 0.3) !important; }
+body, html { background: var(--ov-bg) !important; }
+.header { border-bottom: 1px solid color-mix(in srgb, var(--ov-gold) 30%, transparent) !important; }
 .card, .panel, .section {
-  background: linear-gradient(145deg, #0c0c0c, #060606) !important;
-  border: 1px solid rgba(201, 162, 39, 0.22) !important;
+  background: linear-gradient(145deg, var(--ov-panel), #060606) !important;
+  border: 1px solid color-mix(in srgb, var(--ov-gold) 22%, transparent) !important;
   box-shadow: 0 8px 32px rgba(0,0,0,0.6);
 }
 .overlay-qol-bar a, .overlay-qol-bar button {
-  border-color: rgba(201, 162, 39, 0.35) !important;
-  color: #c9a227 !important;
-  background: #0a0a0a !important;
+  border-color: color-mix(in srgb, var(--ov-gold) 35%, transparent) !important;
+  color: var(--ov-gold) !important;
+  background: var(--ov-panel) !important;
 }
 .overlay-qol-bar a:hover, .overlay-qol-bar button:hover {
   background: rgba(107, 28, 35, 0.25) !important;
-  box-shadow: 0 0 12px rgba(201, 162, 39, 0.25);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--ov-gold) 25%, transparent);
 }
 
 
@@ -850,21 +859,21 @@ input[type="range"] {
   -webkit-appearance: none;
   height: 8px;
   background: #1a0a0c;
-  border: 1px solid rgba(201,162,39,0.4);
+  border: 1px solid color-mix(in srgb, var(--ov-gold) 40%, transparent);
   border-radius: 6px;
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 16px; height: 16px;
   border-radius: 50%;
-  background: linear-gradient(145deg, #c9a227, #8b2942);
+  background: linear-gradient(145deg, var(--ov-gold), var(--ov-rose));
   border: 2px solid #f5ecd7;
 }
 .meter, .meter-fill, .bar-fill {
-  background: linear-gradient(90deg, #8b2942, #c9a227) !important;
+  background: linear-gradient(90deg, var(--ov-rose), var(--ov-gold)) !important;
 }
 .btn, button {
-  border-color: rgba(201,162,39,0.4);
+  border-color: color-mix(in srgb, var(--ov-gold) 40%, transparent);
 }
 
 
@@ -873,12 +882,12 @@ input[type="range"]::-webkit-slider-thumb {
    ============================================ */
 .overlay-clock {
   font-variant-numeric: tabular-nums;
-  color: #c9a227;
+  color: var(--ov-gold);
   font-size: 0.9rem;
   font-weight: 600;
   margin-left: 8px;
   padding: 4px 10px;
-  border: 1px solid rgba(201, 162, 39, 0.35);
+  border: 1px solid color-mix(in srgb, var(--ov-gold) 35%, transparent);
   border-radius: 8px;
   background: rgba(26, 10, 12, 0.8);
 }
@@ -891,8 +900,8 @@ input[type="range"]::-webkit-slider-thumb {
   padding: 8px 4px 12px;
   margin-bottom: 8px;
   font-size: 0.78rem;
-  color: #9a8b6a;
-  border-bottom: 1px solid rgba(201, 162, 39, 0.22);
+  color: var(--ov-muted);
+  border-bottom: 1px solid color-mix(in srgb, var(--ov-gold) 22%, transparent);
   background: linear-gradient(180deg, rgba(10,10,10,0.9), transparent);
 }
 .overlay-status-bar .ov-sep { opacity: 0.4; }
@@ -900,15 +909,15 @@ input[type="range"]::-webkit-slider-thumb {
 .overlay-status-bar #ovStatModel,
 .overlay-status-bar #ovStatSource,
 .overlay-status-bar #ovStatEmotes {
-  color: #e6dcc8;
+  color: var(--ov-text);
 }
 .ov-chip-btn {
   font-size: 0.72rem !important;
   padding: 4px 10px !important;
   border-radius: 999px !important;
-  border: 1px solid rgba(201, 162, 39, 0.4) !important;
+  border: 1px solid color-mix(in srgb, var(--ov-gold) 40%, transparent) !important;
   background: rgba(26, 10, 12, 0.95) !important;
-  color: #c9a227 !important;
+  color: var(--ov-gold) !important;
   cursor: pointer;
 }
 .ov-chip-btn:hover {
@@ -927,28 +936,28 @@ input[type="range"]::-webkit-slider-thumb {
   align-items: center;
   padding: 10px 0 16px;
   margin-bottom: 8px;
-  border-bottom: 1px solid rgba(201, 162, 39, 0.15);
+  border-bottom: 1px solid color-mix(in srgb, var(--ov-gold) 15%, transparent);
 }
 .overlay-qol-bar a,
 .overlay-qol-bar button {
   font-size: 0.8rem;
   padding: 6px 12px;
   border-radius: 8px;
-  border: 1px solid rgba(201, 162, 39, 0.35);
-  background: #0a0a0a;
-  color: #c9a227;
+  border: 1px solid color-mix(in srgb, var(--ov-gold) 35%, transparent);
+  background: var(--ov-panel);
+  color: var(--ov-gold);
   text-decoration: none;
   cursor: pointer;
 }
 .overlay-qol-bar a:hover,
 .overlay-qol-bar button:hover {
   background: rgba(139, 41, 66, 0.3);
-  box-shadow: 0 0 12px rgba(201, 162, 39, 0.25);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--ov-gold) 25%, transparent);
 }
 .ov-badge {
   margin-left: auto;
   font-size: 0.75rem;
-  color: #9a8b6a;
+  color: var(--ov-muted);
 }
 
 .overlay-notes-panel {
@@ -957,11 +966,11 @@ input[type="range"]::-webkit-slider-thumb {
   bottom: 80px;
   width: min(340px, calc(100vw - 24px));
   z-index: 9600;
-  background: linear-gradient(145deg, #0c0c0c, #060606);
-  border: 1px solid rgba(201, 162, 39, 0.35);
+  background: linear-gradient(145deg, var(--ov-panel), #060606);
+  border: 1px solid color-mix(in srgb, var(--ov-gold) 35%, transparent);
   border-radius: 12px;
   padding: 12px;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.7), 0 0 20px rgba(201, 162, 39, 0.12);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.7), 0 0 20px color-mix(in srgb, var(--ov-gold) 12%, transparent);
 }
 .overlay-notes-panel.hidden,
 .overlay-modal.hidden { display: none !important; }
@@ -969,13 +978,13 @@ input[type="range"]::-webkit-slider-thumb {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  color: #c9a227;
+  color: var(--ov-gold);
   margin-bottom: 8px;
 }
 .overlay-notes-header button {
   background: transparent;
-  border: 1px solid rgba(201, 162, 39, 0.35);
-  color: #c9a227;
+  border: 1px solid color-mix(in srgb, var(--ov-gold) 35%, transparent);
+  color: var(--ov-gold);
   border-radius: 6px;
   cursor: pointer;
   padding: 2px 8px;
@@ -983,8 +992,8 @@ input[type="range"]::-webkit-slider-thumb {
 #overlayNotesBody {
   width: 100%;
   background: #070707;
-  border: 1px solid rgba(201, 162, 39, 0.25);
-  color: #e6dcc8;
+  border: 1px solid color-mix(in srgb, var(--ov-gold) 25%, transparent);
+  color: var(--ov-text);
   border-radius: 8px;
   padding: 8px;
   resize: vertical;
@@ -1008,8 +1017,8 @@ input[type="range"]::-webkit-slider-thumb {
 }
 .overlay-modal-card {
   width: min(480px, 100%);
-  background: linear-gradient(145deg, #0c0c0c, #060606);
-  border: 1px solid rgba(201, 162, 39, 0.35);
+  background: linear-gradient(145deg, var(--ov-panel), #060606);
+  border: 1px solid color-mix(in srgb, var(--ov-gold) 35%, transparent);
   border-radius: 12px;
   padding: 16px;
   box-shadow: 0 16px 48px rgba(0,0,0,0.75);
@@ -1020,13 +1029,13 @@ input[type="range"]::-webkit-slider-thumb {
   gap: 8px 14px;
   margin-top: 12px;
   align-items: center;
-  color: #e6dcc8;
+  color: var(--ov-text);
   font-size: 0.9rem;
 }
 .overlay-hotkey-grid kbd {
   background: #1a0a0c;
-  border: 1px solid rgba(201, 162, 39, 0.4);
-  color: #c9a227;
+  border: 1px solid color-mix(in srgb, var(--ov-gold) 40%, transparent);
+  color: var(--ov-gold);
   border-radius: 4px;
   padding: 2px 7px;
   font-size: 0.8rem;
@@ -1045,16 +1054,16 @@ input[type="range"]::-webkit-slider-thumb {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  border: 1px solid rgba(201, 162, 39, 0.45);
-  background: #0a0a0a;
-  color: #c9a227;
+  border: 1px solid color-mix(in srgb, var(--ov-gold) 45%, transparent);
+  background: var(--ov-panel);
+  color: var(--ov-gold);
   cursor: pointer;
   box-shadow: 0 4px 16px rgba(0,0,0,0.5);
   font-size: 1.1rem;
 }
 .overlay-fab button:hover {
   background: rgba(139, 41, 66, 0.35);
-  box-shadow: 0 0 18px rgba(201, 162, 39, 0.35);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--ov-gold) 35%, transparent);
 }
 
 /* Keep range/sliders visible in overlay */
@@ -1062,7 +1071,7 @@ input[type="range"] {
   -webkit-appearance: none;
   height: 8px;
   background: linear-gradient(90deg, #1a0a0c, #2a1218);
-  border: 1px solid rgba(201, 162, 39, 0.4);
+  border: 1px solid color-mix(in srgb, var(--ov-gold) 40%, transparent);
   border-radius: 6px;
 }
 input[type="range"]::-webkit-slider-thumb {
@@ -1070,7 +1079,7 @@ input[type="range"]::-webkit-slider-thumb {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: linear-gradient(145deg, #c9a227, #8b2942);
+  background: linear-gradient(145deg, var(--ov-gold), var(--ov-rose));
   border: 2px solid #f5ecd7;
   cursor: pointer;
 }
