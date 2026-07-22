@@ -125,7 +125,7 @@
         .as-help-list kbd,.as-help-global kbd{background:var(--as-bg,#0a0a0a);border:1px solid var(--as-border,#444);border-radius:4px;padding:1px 6px;font-size:12px}
         .as-help-foot{margin:12px 0 0;font-size:11px;color:var(--as-muted,#666)}
         #asHelpFab{
-          position:fixed; top:14px; right:14px; z-index:9000;
+          position:fixed; bottom:18px; left:14px; top:auto; right:auto; z-index:9000;
           border-radius:10px; padding:8px 14px; cursor:pointer;
           background:var(--as-panel, var(--bg-panel, #121212));
           color:var(--as-accent, var(--accent-gold, #c9a227));
@@ -161,7 +161,9 @@
     fab.onclick = show;
     // Inline fallback styles (in case shared CSS is late)
     fab.style.cssText = [
-      'position:fixed', 'top:14px', 'right:14px', 'z-index:9000',
+      // bottom-left; lift if global player bar exists
+
+      'position:fixed', 'bottom:18px', 'left:14px', 'z-index:9000',
       'border-radius:10px', 'padding:8px 14px', 'cursor:pointer',
       'background:var(--as-panel,#121212)', 'color:var(--as-accent,#c9a227)',
       'border:1px solid var(--as-border,rgba(201,162,39,.45))',
@@ -169,6 +171,16 @@
       'box-shadow:0 4px 18px rgba(0,0,0,.4)', 'letter-spacing:.02em'
     ].join(';');
     document.body.appendChild(fab);
+    function placeFab() {
+      var bar = document.getElementById('asGlobalAudioBar');
+      var bottom = (bar && bar.offsetParent !== null && !bar.classList.contains('collapsed')) ? '72px' : '18px';
+      fab.style.bottom = bottom;
+      fab.style.left = '14px';
+      fab.style.top = 'auto';
+      fab.style.right = 'auto';
+    }
+    placeFab();
+    setInterval(placeFab, 2000);
   }
 
   document.addEventListener('keydown', (e) => {
