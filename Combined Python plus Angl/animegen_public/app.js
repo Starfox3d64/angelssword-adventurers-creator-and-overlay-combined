@@ -196,3 +196,50 @@
   refreshStatus();
   refreshOutputs();
 })();
+
+
+/* Prompt history (last 12) */
+(function () {
+  const KEY = 'as_animegen_prompts';
+  function load() { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (_) { return []; } }
+  function save(a) { localStorage.setItem(KEY, JSON.stringify(a.slice(0, 12))); }
+  function render() {
+    const host = document.getElementById('promptHistory');
+    if (!host) return;
+    const list = load();
+    if (!list.length) { host.innerHTML = ''; return; }
+    host.innerHTML = '<span style="color:var(--as-muted)">Recent:</span> ' + list.map((p, i) =>
+      '<button type="button" class="btn sm" data-ph="' + i + '" style="margin:2px" title="' + p.replace(/"/g, '&quot;') + '">' +
+      (p.length > 40 ? p.slice(0, 40) + '…' : p) + '</button>'
+    ).join(' ');
+    host.querySelectorAll('[data-ph]').forEach((btn) => {
+      btn.onclick = () => {
+        const ta = document.getElementById('prompt') || document.querySelector('textarea');
+        if (ta) ta.value = load()[parseInt(btn.getAttribute('data-ph'), 10)] || '';
+      };
+    });
+  }
+  function push(text) {
+    if (!text || !text.trim()) return;
+    let a = load().filter((x) => x !== text.trim());
+    a.unshift(text.trim());
+    save(a);
+    render();
+  }
+  window.__ASAnimeGenRememberPrompt = push;
+  // Hook generate button
+  function boot() {
+    render();
+    const clr = document.getElementById('btnClearPromptHist');
+    if (clr) clr.onclick = () => { localStorage.removeItem(KEY); render(); };
+    const gen = document.getElementById('btnGenerate') || document.querySelector('[data-action="generate"]');
+    if (gen) {
+      gen.addEventListener('click', () => {
+        const ta = document.getElementById('prompt') || document.querySelector('textarea');
+        if (ta) push(ta.value);
+      }, true);
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
