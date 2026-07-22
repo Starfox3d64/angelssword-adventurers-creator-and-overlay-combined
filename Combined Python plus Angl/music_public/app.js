@@ -740,3 +740,84 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();
+
+
+/* Favorites + fade-out stop */
+(function () {
+  const FAV_KEY = 'as_music_favorites';
+  function $(id) { return document.getElementById(id); }
+  function loadFavs() {
+    try { return JSON.parse(localStorage.getItem(FAV_KEY) || '[]'); } catch (_) { return []; }
+  }
+  function saveFavs(a) { localStorage.setItem(FAV_KEY, JSON.stringify(a)); }
+  function toggleFav(id) {
+    let a = loadFavs();
+    if (a.includes(id)) a = a.filter((x) => x !== id);
+    else a.push(id);
+    saveFavs(a);
+    return a.includes(id);
+  }
+  window.__ASMusicIsFav = (id) => loadFavs().includes(id);
+  window.__ASMusicToggleFav = toggleFav;
+
+  // Enhance library render: star button via event delegation
+  document.addEventListener('click', (e) => {
+    const star = e.target.closest('[data-fav-id]');
+    if (!star) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const id = star.getAttribute('data-fav-id');
+    const on = toggleFav(id);
+    star.textContent = on ? '★' : '☆';
+    star.title = on ? 'Unfavorite' : 'Favorite';
+  });
+
+  // Patch library items after refresh — observe
+  const host = $('libraryList');
+  if (host) {
+    const obs = new MutationObserver(() => {
+      host.querySelectorAll('.lib-item').forEach((el) => {
+        if (el.querySelector('[data-fav-id]')) return;
+        const id = el.dataset.id || el.dataset.url || '';
+        if (!id) return;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn sm';
+        btn.style.marginLeft = '6px';
+        btn.setAttribute('data-fav-id', id);
+        const on = loadFavs().includes(id);
+        btn.textContent = on ? '★' : '☆';
+        btn.title = on ? 'Unfavorite' : 'Favorite';
+        el.appendChild(btn);
+      });
+      // Sort favorites to top optionally — leave order, just mark
+    });
+    obs.observe(host, { childList: true, subtree: true });
+  }
+
+  // Fade stop
+  function fadeStop(audio, ms) {
+    if (!audio) return;
+    const start = audio.volume;
+    const t0 = performance.now();
+    function step(t) {
+      const p = Math.min(1, (t - t0) / ms);
+      audio.volume = start * (1 - p);
+      if (p < 1) requestAnimationFrame(step);
+      else { audio.pause(); audio.volume = start; }
+    }
+    requestAnimationFrame(step);
+  }
+  function boot() {
+    const btn = $('btnFadeStop');
+    if (btn) btn.onclick = () => {
+      const local = $('localPlayer');
+      if (local && !local.paused) fadeStop(local, 1200);
+      if (window.__ASGlobalAudio && window.__ASGlobalAudio.audio) {
+        fadeStop(window.__ASGlobalAudio.audio, 1200);
+      }
+    };
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();

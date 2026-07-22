@@ -108,7 +108,8 @@
             <p class="dim small" id="exportSpeedStatus" style="margin-top:4px"></p>
             <p class="dim small" style="margin-top:6px">Playback rate applies to the player and to Global BGM when set.</p>
             <div class="row" style="margin-top:12px">
-              <button class="btn primary" id="btnSetGlobal">🌐 Set as Active Global BGM</button>
+              <button type="button" class="btn sm" id="btnFadeStop">Fade stop</button>
+          <button class="btn primary" id="btnSetGlobal">🌐 Set as Active Global BGM</button>
               <button class="btn" id="btnLoop">Loop: On</button>
               <button class="btn" id="btnDownloadTrack">Download</button>
             </div>
@@ -148,5 +149,6 @@
   <button type="button" onclick="this.parentElement.remove()" style="float:right;background:transparent;border:none;color:var(--as-muted);cursor:pointer;font-size:14px;line-height:1" title="Dismiss">✕</button>
   💡 <b style="color:var(--as-accent,#c9a227)">Global BGM:</b> After generating or loading a track, click <b>Set as Active Global BGM</b>. Playback continues while you use Creator, Models, Overlay, AnimeGen, or Tetris.
 </div>
+  <script src="/shared/shortcuts.js"></script>
 </body>
 </html>
