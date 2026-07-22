@@ -13,6 +13,7 @@
     time: 'as_global_audio_time',
     volume: 'as_global_audio_volume',
     loop: 'as_global_audio_loop',
+    rate: 'as_global_audio_rate',
   };
 
   const audio = new Audio();
@@ -27,6 +28,7 @@
       time: parseFloat(localStorage.getItem(KEYS.time) || '0') || 0,
       volume: parseFloat(localStorage.getItem(KEYS.volume) || '0.8') || 0.8,
       loop: localStorage.getItem(KEYS.loop) !== '0',
+      rate: parseFloat(localStorage.getItem(KEYS.rate) || localStorage.getItem('as_music_playback_rate') || '1') || 1,
     };
   }
 
@@ -49,6 +51,7 @@
       }
       audio.loop = loadState().loop;
       audio.volume = loadState().volume;
+      audio.playbackRate = loadState().rate || 1;
       const p = audio.play();
       savePartial({ playing: true });
       updateUI();
@@ -74,6 +77,13 @@
     setLoop(on) {
       audio.loop = !!on;
       savePartial({ loop: !!on });
+    },
+    setRate(r) {
+      r = Math.max(0.5, Math.min(2, Number(r) || 1));
+      audio.playbackRate = r;
+      savePartial({ rate: r });
+      try { localStorage.setItem('as_music_playback_rate', String(r)); } catch (_) {}
+      updateUI();
     },
     setAsGlobalBgm(url, title) {
       return this.play(url, title);
@@ -180,6 +190,8 @@
       <span id="asGapTime" class="extra">0:00 / 0:00</span>
       <input type="range" id="asGapScrub" class="extra" min="0" max="1000" value="0" title="Seek" />
       <input type="range" id="asGapVol" min="0" max="1" step="0.01" value="0.8" title="Volume" />
+      <span class="extra" id="asGapRateLab" title="Speed">1×</span>
+      <input type="range" id="asGapRate" min="0.5" max="2" step="0.05" value="1" title="Playback speed" />
       <button type="button" id="asGapMute" title="Mute">🔇</button>
       <a href="/music" id="asGapOpenMusic" title="Open Music Workspace">Music</a>
       <button type="button" id="asGapHide" title="Minimize">▾</button>
@@ -194,6 +206,11 @@
     };
     $('asGapStop').onclick = () => api.stop();
     $('asGapVol').oninput = (e) => api.setVolume(e.target.value);
+    const rateEl = $('asGapRate');
+    if (rateEl) {
+      rateEl.value = String(loadState().rate || 1);
+      rateEl.oninput = (e) => api.setRate(e.target.value);
+    }
     $('asGapScrub').oninput = (e) => {
       if (!audio.duration) return;
       audio.currentTime = (parseFloat(e.target.value) / 1000) * audio.duration;
@@ -218,6 +235,10 @@
     if (play) play.textContent = audio.paused ? '▶' : '⏸';
     const vol = $('asGapVol');
     if (vol) vol.value = String(audio.volume);
+    const rate = $('asGapRate');
+    if (rate) rate.value = String(audio.playbackRate || 1);
+    const rateLab = $('asGapRateLab');
+    if (rateLab) rateLab.textContent = (audio.playbackRate || 1).toFixed(2).replace(/\.00$/, '') + '×';
   }
 
   function resumeIfNeeded() {
