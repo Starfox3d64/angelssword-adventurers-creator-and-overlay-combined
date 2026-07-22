@@ -1487,6 +1487,19 @@
                     <div class="panel-title"><span class="title-icon">🧰</span> Data Tools</div>
                     <div class="panel-subtitle">Backup preferences or clear local data. API keys are included in export — keep the file private.</div>
                     <div class="btn-group" style="display:flex; gap:8px; flex-wrap:wrap;">
+                        
+                        <div class="form-group" style="margin-top:12px">
+                            <label class="form-label">WebM Export Render Mode <span class="text-dim">(Angular 0.4.0)</span></label>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                                <select id="exportRenderMode" class="form-input" style="max-width:220px">
+                                    <option value="cpu">CPU (PNG transit — default)</option>
+                                    <option value="gpu">GPU / RGBA (raw buffers)</option>
+                                </select>
+                                <span id="webgpuStatus" class="text-dim" style="font-size:0.78rem">WebGPU: checking…</span>
+                            </div>
+                            <small class="text-dim">CPU is usually faster. GPU/RGBA streams uncompressed frames to ffmpeg (avoids rare PNG→VP9 artefacts; helps if CPU/RAM limited).</small>
+                        </div>
+
                         <button class="btn btn-sm btn-secondary" id="settingsExportPrefs">⬇ Export Settings JSON</button>
                         <button class="btn btn-sm btn-secondary" id="settingsImportPrefs">⬆ Import Settings JSON</button>
                         <button class="btn btn-sm btn-danger" id="settingsResetLocal">🗑 Reset Local Data</button>

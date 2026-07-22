@@ -681,6 +681,32 @@ class GifDecoder {
 //  CHROMA KEY — Multi-pass processor (4-step pipeline)
 // ═══════════════════════════════════════════════════════════════════
 
+
+/* ── Angular 0.4.0 parity: WebGPU detect + export render mode ───────── */
+async function detectWebGPU() {
+    try {
+        if (!navigator.gpu) return { ok: false, reason: 'navigator.gpu missing' };
+        const adapter = await navigator.gpu.requestAdapter();
+        if (!adapter) return { ok: false, reason: 'no adapter' };
+        const device = await adapter.requestDevice();
+        // Tiny smoke test: create buffer
+        const buf = device.createBuffer({ size: 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+        buf.destroy();
+        device.destroy?.();
+        return { ok: true };
+    } catch (e) {
+        return { ok: false, reason: e.message || String(e) };
+    }
+}
+
+function getExportRenderMode() {
+    // cpu (default) | gpu — gpu streams raw RGBA to server (no PNG intermediate)
+    return localStorage.getItem('as_export_render_mode') || 'cpu';
+}
+function setExportRenderMode(mode) {
+    localStorage.setItem('as_export_render_mode', mode === 'gpu' ? 'gpu' : 'cpu');
+}
+
 class ChromaKey {
     constructor() {
         this.keyR = 0;
@@ -3062,9 +3088,19 @@ class ModelExporter {
      * Server-side transparent WebM export via ffmpeg (true alpha).
      */
     async _exportViaServerFfmpeg(frameList, width, height, exportFps, drawScaled, recCanvas, recCtx, progressFill, progressText) {
-        const sessRes = await fetch('/api/export/session', { method: 'POST' });
+        // Angular 0.4.0: cpu = PNG frames (default); gpu = raw RGBA (no PNG intermediate)
+        const renderMode = (typeof getExportRenderMode === 'function' ? getExportRenderMode() : 'cpu');
+        const useRgba = renderMode === 'gpu';
+        const sessRes = await fetch('/api/export/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(useRgba
+                ? { format: 'rgba', width, height }
+                : { format: 'png' })
+        });
         if (!sessRes.ok) return null;
-        const { sessionId } = await sessRes.json();
+        const sess = await sessRes.json();
+        const sessionId = sess.sessionId;
         if (!sessionId) return null;
 
         const total = frameList.length;
@@ -3083,23 +3119,36 @@ class ModelExporter {
                 this.chromaKey.applyEdgeFade(imageData, this.chromaKey.edgeFadeWidth);
                 recCtx.putImageData(imageData, 0, 0);
 
-                const blob = await new Promise(resolve => recCanvas.toBlob(resolve, 'image/png'));
-                const buf = await blob.arrayBuffer();
-                const up = await fetch(`/api/export/session/${sessionId}/frame?index=${fi}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'image/png' },
-                    body: buf
-                });
+                let up;
+                if (useRgba) {
+                    // Raw uncompressed RGBA — avoids rare PNG→VP9 double-compression artefacts
+                    const buf = imageData.data.buffer.slice(
+                        imageData.data.byteOffset,
+                        imageData.data.byteOffset + imageData.data.byteLength
+                    );
+                    up = await fetch(`/api/export/session/${sessionId}/frame?index=${fi}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/octet-stream' },
+                        body: buf
+                    });
+                } else {
+                    const blob = await new Promise(resolve => recCanvas.toBlob(resolve, 'image/png'));
+                    const buf = await blob.arrayBuffer();
+                    up = await fetch(`/api/export/session/${sessionId}/frame?index=${fi}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'image/png' },
+                        body: buf
+                    });
+                }
                 if (!up.ok) throw new Error(`Frame upload failed at ${fi}`);
 
                 const pct = ((fi + 1) / total) * 70;
                 progressFill.style.width = pct + '%';
-                progressText.textContent = `Uploading frame ${fi + 1} / ${total}...`;
+                progressText.textContent = `Uploading frame ${fi + 1} / ${total} (${useRgba ? 'GPU/RGBA' : 'CPU/PNG'})...`;
             }
 
             progressText.textContent = 'Encoding transparent WebM (ffmpeg)...';
             progressFill.style.width = '85%';
-
             const fin = await fetch(`/api/export/session/${sessionId}/finalize`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -3109,15 +3158,17 @@ class ModelExporter {
                 const err = await fin.json().catch(() => ({}));
                 throw new Error(err.error || 'Finalize failed');
             }
+            const webmBlob = await fin.blob();
             progressFill.style.width = '100%';
-            return await fin.blob();
+            return webmBlob;
         } catch (e) {
             try { await fetch(`/api/export/session/${sessionId}`, { method: 'DELETE' }); } catch (_) {}
             if (e.message === 'cancelled') throw e;
-            console.warn('[ModelExporter] Server export failed:', e);
+            console.warn('Server ffmpeg export failed:', e);
             return null;
         }
     }
+
 
 }
 
@@ -3130,3 +3181,26 @@ document.addEventListener('DOMContentLoaded', () => {
     window.modelExporter = new ModelExporter();
     console.log('📦 Model Exporter initialized');
 });
+
+
+/* Wire export render mode + WebGPU status (0.4.0) */
+(function wireExportRenderMode() {
+    function apply() {
+        const sel = document.getElementById('exportRenderMode');
+        if (!sel) return;
+        sel.value = (typeof getExportRenderMode === 'function' ? getExportRenderMode() : 'cpu');
+        sel.onchange = () => setExportRenderMode(sel.value);
+    }
+    async function status() {
+        const el = document.getElementById('webgpuStatus');
+        if (!el || typeof detectWebGPU !== 'function') return;
+        const r = await detectWebGPU();
+        el.textContent = r.ok ? 'WebGPU: available (previews may use GPU path when enabled)' : ('WebGPU: not available' + (r.reason ? ` — ${r.reason}` : ''));
+        el.style.color = r.ok ? 'var(--accent-gold, #c9a227)' : 'var(--text-dim, #666)';
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => { apply(); status(); });
+    } else {
+        apply(); status();
+    }
+})();
