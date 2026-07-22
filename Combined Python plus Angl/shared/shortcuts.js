@@ -124,10 +124,23 @@
         .as-help-global{margin-top:14px;padding-top:10px;border-top:1px solid var(--as-border,#333);color:var(--as-muted,#999);font-size:13px}
         .as-help-list kbd,.as-help-global kbd{background:var(--as-bg,#0a0a0a);border:1px solid var(--as-border,#444);border-radius:4px;padding:1px 6px;font-size:12px}
         .as-help-foot{margin:12px 0 0;font-size:11px;color:var(--as-muted,#666)}
-        #asHelpFab{position:fixed;right:16px;bottom:70px;z-index:9000;border-radius:999px;padding:8px 14px;cursor:pointer;
-          background:var(--as-panel,#1a1a1a);color:var(--as-accent,#c9a227);border:1px solid var(--as-border,rgba(201,162,39,.45));
-          font:600 12px/1 system-ui,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.35)}
-        #asHelpFab:hover{filter:brightness(1.15)}
+        #asHelpFab{
+          position:fixed; top:14px; right:14px; z-index:9000;
+          border-radius:10px; padding:8px 14px; cursor:pointer;
+          background:var(--as-panel, var(--bg-panel, #121212));
+          color:var(--as-accent, var(--accent-gold, #c9a227));
+          border:1px solid var(--as-border, rgba(201,162,39,.45));
+          font:600 12px/1.2 system-ui,sans-serif;
+          box-shadow:0 4px 18px rgba(0,0,0,.4);
+          letter-spacing:.02em;
+        }
+        #asHelpFab:hover{
+          filter:brightness(1.12);
+          border-color:var(--as-accent, #c9a227);
+          box-shadow:0 0 0 1px var(--as-accent, #c9a227), 0 6px 20px rgba(0,0,0,.45);
+        }
+        body.as-main-menu #asHelpFab,
+        html[data-main="1"] #asHelpFab { display:none !important; }
       `;
       document.head.appendChild(style);
     }
@@ -138,12 +151,23 @@
 
   function ensureFab() {
     if (document.getElementById('asHelpFab')) return;
+    // Main menu already has "F1 Help & Tips" in the theme row — skip floating fab there
+    if (pathKey() === '/' || document.getElementById('asMainF1Btn')) return;
     const fab = document.createElement('button');
     fab.id = 'asHelpFab';
     fab.type = 'button';
     fab.title = 'Help & tips (F1)';
-    fab.textContent = 'F1 Help';
+    fab.textContent = 'F1 · Tips';
     fab.onclick = show;
+    // Inline fallback styles (in case shared CSS is late)
+    fab.style.cssText = [
+      'position:fixed', 'top:14px', 'right:14px', 'z-index:9000',
+      'border-radius:10px', 'padding:8px 14px', 'cursor:pointer',
+      'background:var(--as-panel,#121212)', 'color:var(--as-accent,#c9a227)',
+      'border:1px solid var(--as-border,rgba(201,162,39,.45))',
+      'font:600 12px/1.2 system-ui,sans-serif',
+      'box-shadow:0 4px 18px rgba(0,0,0,.4)', 'letter-spacing:.02em'
+    ].join(';');
     document.body.appendChild(fab);
   }
 
@@ -160,6 +184,11 @@
   });
 
   function boot() {
+    var path = pathKey();
+    if (path === '/') {
+      document.body.classList.add('as-main-menu');
+      document.documentElement.setAttribute('data-main', '1');
+    }
     ensureFab();
     // Main menu: also put a clear tip under themes if present
     if (pathKey() === '/') {
