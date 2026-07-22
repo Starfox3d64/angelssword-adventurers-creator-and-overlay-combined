@@ -425,10 +425,10 @@
 
 
 
-  <script src="/live2d/app.js?v=22"></script>
+  <script src="/live2d/app.js?v=23"></script>
 
 <script>
-/* CAPTURE v3 — assigns window.__asShot / window.__asCopy before anything else can fail */
+/* CAPTURE v4 — WYSIWYG (respects Media Tweak transforms) + quiet clipboard fallback */
 (function () {
   function byId(id) { return document.getElementById(id); }
 
@@ -438,40 +438,73 @@
     console.log('[capture]', msg);
   }
 
-  function canvasFromImage(img) {
-    if (!img || !img.src) return null;
-    var w = img.naturalWidth || img.width || img.clientWidth;
-    var h = img.naturalHeight || img.height || img.clientHeight;
-    if (!w || !h) return null;
-    var c = document.createElement('canvas');
-    c.width = w;
-    c.height = h;
-    var ctx = c.getContext('2d');
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, w, h);
-    ctx.drawImage(img, 0, 0, w, h);
-    return c;
+  function tweak() {
+    return {
+      scale: parseFloat((byId('mediaScale') && byId('mediaScale').value) || '1') || 1,
+      x: parseFloat((byId('mediaX') && byId('mediaX').value) || '0') || 0,
+      y: parseFloat((byId('mediaY') && byId('mediaY').value) || '0') || 0,
+      rot: parseFloat((byId('mediaRot') && byId('mediaRot').value) || '0') || 0,
+      op: parseFloat((byId('mediaOp') && byId('mediaOp').value) || '1') || 1
+    };
   }
 
-  function canvasFromVideo(vid) {
-    if (!vid) return null;
-    var w = vid.videoWidth, h = vid.videoHeight;
-    if (!w || !h) return null;
+  /** Draw image/video into canvas WITH current Media Tweak transforms (WYSIWYG). */
+  function compositeMedia() {
+    var img = byId('mediaImage');
+    var vid = byId('mediaVideo');
+    var srcEl = null;
+    var sw = 0, sh = 0;
+
+    if (vid && !vid.classList.contains('hidden') && vid.style.display !== 'none' && vid.videoWidth > 0) {
+      srcEl = vid;
+      sw = vid.videoWidth;
+      sh = vid.videoHeight;
+    } else if (img && img.src) {
+      srcEl = img;
+      sw = img.naturalWidth || img.width || img.clientWidth;
+      sh = img.naturalHeight || img.height || img.clientHeight;
+    }
+    if (!srcEl || !sw || !sh) return null;
+
+    var t = tweak();
+    // Output size: large enough for rotation + offset
+    var pad = Math.ceil(Math.sqrt(sw * sw + sh * sh) * Math.max(t.scale, 1) + Math.abs(t.x) + Math.abs(t.y) + 4);
+    var cw = Math.max(sw, pad);
+    var ch = Math.max(sh, pad);
+    // Prefer viewport size if available for "what you see"
+    var vp = byId('viewport') || byId('mediaStage');
+    if (vp && vp.clientWidth > 50 && vp.clientHeight > 50) {
+      cw = Math.max(cw, vp.clientWidth);
+      ch = Math.max(ch, vp.clientHeight);
+    }
+
     var c = document.createElement('canvas');
-    c.width = w;
-    c.height = h;
+    c.width = Math.min(cw, 4096);
+    c.height = Math.min(ch, 4096);
     var ctx = c.getContext('2d');
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, w, h);
-    ctx.drawImage(vid, 0, 0, w, h);
+
+    // Transparent background (alpha)
+    ctx.clearRect(0, 0, c.width, c.height);
+
+    ctx.save();
+    ctx.translate(c.width / 2 + t.x, c.height / 2 + t.y);
+    ctx.rotate((t.rot * Math.PI) / 180);
+    ctx.scale(t.scale, t.scale);
+    ctx.globalAlpha = Math.max(0, Math.min(1, t.op));
+    try {
+      ctx.drawImage(srcEl, -sw / 2, -sh / 2, sw, sh);
+    } catch (e) {
+      console.error('drawImage failed', e);
+      ctx.restore();
+      return null;
+    }
+    ctx.restore();
     return c;
   }
 
   function canvasFromPixi() {
     var pixi = window.__ASPixiApp;
-    try {
-      if (!pixi && typeof app !== 'undefined') pixi = app;
-    } catch (e) {}
+    try { if (!pixi && typeof app !== 'undefined') pixi = app; } catch (e) {}
     if (!pixi || !pixi.renderer) return null;
     try {
       pixi.renderer.render(pixi.stage);
@@ -492,108 +525,57 @@
       out.width = canvas.width;
       out.height = canvas.height;
       out.getContext('2d').drawImage(canvas, 0, 0);
-      // Detect blank (all transparent/black) — still return; user can see
       return out;
     } catch (e) {
-      // WebGL tainted or blocked — try toDataURL on original
-      try {
-        var u = canvas.toDataURL('image/png');
-        if (u && u.length > 100) {
-          var im = new Image();
-          // sync path not available; return canvas anyway
-        }
-      } catch (e2) {}
       return canvas;
     }
   }
 
   function grab() {
-    // 1. Media image (ignore hidden class if src set — style may show it)
+    // Prefer transformed media composite when media is loaded
     var img = byId('mediaImage');
-    if (img && img.src && img.src !== window.location.href) {
-      var ci = canvasFromImage(img);
-      if (ci) { status('Captured media image ' + ci.width + 'x' + ci.height); return ci; }
-    }
-    // 2. Media video
     var vid = byId('mediaVideo');
-    if (vid && (vid.src || vid.currentSrc) && vid.videoWidth) {
-      var cv = canvasFromVideo(vid);
-      if (cv) { status('Captured video frame ' + cv.width + 'x' + cv.height); return cv; }
+    var hasMedia = (img && img.src) || (vid && (vid.src || vid.currentSrc) && vid.videoWidth);
+    if (hasMedia) {
+      var cm = compositeMedia();
+      if (cm && cm.width) {
+        status('Captured view ' + cm.width + 'x' + cm.height + ' (with transforms)');
+        return cm;
+      }
     }
-    // 3. PIXI stage
     var cp = canvasFromPixi();
-    if (cp && cp.width) { status('Captured Live2D (PIXI) ' + cp.width + 'x' + cp.height); return cp; }
-    // 4. Raw canvas
+    if (cp && cp.width) {
+      status('Captured Live2D ' + cp.width + 'x' + cp.height);
+      return cp;
+    }
     var cw = canvasFromWebGL();
-    if (cw && cw.width) { status('Captured canvas ' + cw.width + 'x' + cw.height); return cw; }
+    if (cw && cw.width) {
+      status('Captured canvas ' + cw.width + 'x' + cw.height);
+      return cw;
+    }
     return null;
   }
 
   function downloadCanvas(c) {
     var url = c.toDataURL('image/png');
     var a = document.createElement('a');
-    a.download = 'as-capture-' + Date.now() + '.png';
+    a.download = 'as-view-' + Date.now() + '.png';
     a.href = url;
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
-    setTimeout(function () { a.remove(); }, 500);
-    status('Download started');
-  }
-
-
-  function downloadFromUrl(url, name) {
-    return fetch(url).then(function (res) { return res.blob(); }).then(function (blob) {
-      var a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = name || ('as-capture-' + Date.now() + '.png');
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      status('Download started');
-      return true;
-    }).catch(function () {
-      try {
-        var a2 = document.createElement('a');
-        a2.href = url;
-        a2.download = name || ('as-capture-' + Date.now() + '.png');
-        document.body.appendChild(a2);
-        a2.click();
-        a2.remove();
-        status('Download started');
-        return true;
-      } catch (e2) {
-        return false;
-      }
-    });
+    setTimeout(function () { a.remove(); }, 400);
+    status('Saved transformed view PNG');
   }
 
   function shot() {
     try {
-      var img = byId('mediaImage');
-      if (img && img.src && img.src !== location.href && img.src.indexOf('data:') !== 0) {
-        // Direct export of the loaded media file (most reliable)
-        downloadFromUrl(img.src, 'as-media-' + Date.now() + '.png').then(function (ok) {
-          if (ok === false) {
-            try {
-              var c = canvasFromImage(img);
-              if (c) downloadCanvas(c);
-              else alert('Could not export image');
-            } catch (e) { alert('Export failed: ' + e.message); }
-          }
-        });
-        return;
-      }
-      if (img && img.src && img.src.indexOf('data:') === 0) {
-        var a = document.createElement('a');
-        a.href = img.src;
-        a.download = 'as-media-' + Date.now() + '.png';
-        a.click();
-        return;
-      }
       var c = grab();
       if (!c || !c.width) {
-        alert('Nothing to capture yet.\n\n• Media mode: open an image or video first\n• Live2D mode: load a .model3.json package first');
+        alert('Nothing to capture yet.
+
+• Media: open an image/video and adjust sliders if you want
+• Live2D: load a .model3.json package');
         return;
       }
       downloadCanvas(c);
@@ -603,39 +585,32 @@
     }
   }
 
-
   function copy() {
     try {
-      var img = byId('mediaImage');
-      if (img && img.src && img.src !== location.href) {
-        fetch(img.src).then(function (r) { return r.blob(); }).then(function (blob) {
-          if (navigator.clipboard && window.ClipboardItem) {
-            return navigator.clipboard.write([new ClipboardItem({ [blob.type || 'image/png']: blob })]);
-          }
-          throw new Error('no clipboard');
-        }).then(function () {
-          status('Copied to clipboard');
-          alert('Copied to clipboard');
-        }).catch(function () {
-          shot();
-          alert('Clipboard blocked — download used instead');
-        });
-        return;
-      }
       var c = grab();
       if (!c || !c.width) {
         alert('Nothing to capture yet. Load media or a model first.');
         return;
       }
       c.toBlob(function (blob) {
-        if (!blob) { downloadCanvas(c); return; }
+        if (!blob) {
+          downloadCanvas(c);
+          return;
+        }
         if (navigator.clipboard && window.ClipboardItem) {
           navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
-            .then(function () { status('Copied to clipboard'); alert('Copied to clipboard'); })
-            .catch(function () { downloadCanvas(c); alert('Clipboard blocked — PNG downloaded instead'); });
+            .then(function () {
+              status('Copied transformed view');
+              // Quiet success — no alert spam
+            })
+            .catch(function () {
+              // Clipboard often blocked on http://localhost in some browsers — just download
+              downloadCanvas(c);
+              status('Clipboard unavailable — downloaded PNG instead');
+            });
         } else {
           downloadCanvas(c);
-          alert('PNG downloaded (clipboard not available)');
+          status('Downloaded PNG (no clipboard API)');
         }
       }, 'image/png');
     } catch (e) {
@@ -644,12 +619,10 @@
     }
   }
 
-  // Global hooks used by inline onclick
   window.__asShot = shot;
   window.__asCopy = copy;
   window.__ASForceCapture = { shot: shot, copy: copy, grab: grab };
 
-  // Also bind any buttons that appear later (toolbar)
   function wireAll() {
     document.querySelectorAll('#btnScreenshot, #btnScreenshotMediaTab, [data-action="screenshot"]').forEach(function (b) {
       b.onclick = function (e) { e.preventDefault(); e.stopPropagation(); shot(); return false; };
@@ -663,6 +636,9 @@
   setInterval(wireAll, 1500);
 })();
 </script>
+
+
+
 
 
 
