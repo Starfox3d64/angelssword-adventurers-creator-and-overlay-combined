@@ -220,6 +220,7 @@
 
   function selectTrack(t) {
     currentTrack = t;
+    window.__ASMusicCurrentTrack = t;
     document.querySelectorAll('.lib-item').forEach((el) => el.classList.toggle('active', el.dataset.id === t.id));
     $('playerTitle').textContent = t.title;
     $('localPlayer').src = t.url;
@@ -576,4 +577,166 @@
 
   // Expose delete for enhanced items after refreshLibrary runs
   window.__musicDeleteTrack = deleteTrack;
+})();
+
+
+/* Playback rate (speed up / slow down) */
+(function () {
+  const KEY = 'as_music_playback_rate';
+  function $(id) { return document.getElementById(id); }
+  function applyRate(r) {
+    r = Math.max(0.5, Math.min(2, Number(r) || 1));
+    try { localStorage.setItem(KEY, String(r)); } catch (_) {}
+    const audio = $('localPlayer');
+    if (audio) audio.playbackRate = r;
+    if (window.__ASGlobalAudio && window.__ASGlobalAudio.audio) {
+      window.__ASGlobalAudio.audio.playbackRate = r;
+    }
+    if (window.__ASGlobalAudio && typeof window.__ASGlobalAudio.setRate === 'function') {
+      window.__ASGlobalAudio.setRate(r);
+    }
+    const slider = $('playbackRate');
+    const lab = $('playbackRateVal');
+    if (slider) slider.value = String(r);
+    if (lab) lab.textContent = r.toFixed(2) + '×';
+  }
+  function boot() {
+    let r = parseFloat(localStorage.getItem(KEY) || '1') || 1;
+    applyRate(r);
+    const slider = $('playbackRate');
+    if (slider) slider.addEventListener('input', () => applyRate(slider.value));
+    if ($('rateSlower')) $('rateSlower').onclick = () => applyRate((parseFloat(slider && slider.value) || 1) - 0.1);
+    if ($('rateFaster')) $('rateFaster').onclick = () => applyRate((parseFloat(slider && slider.value) || 1) + 0.1);
+    if ($('rateReset')) $('rateReset').onclick = () => applyRate(1);
+    // When a track loads into local player, re-apply rate
+    const audio = $('localPlayer');
+    if (audio) {
+      audio.addEventListener('loadedmetadata', () => applyRate(localStorage.getItem(KEY) || 1));
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+
+
+/* Export track permanently at current playback speed */
+(function () {
+  function $(id) { return document.getElementById(id); }
+  function currentRate() {
+    const s = $('playbackRate');
+    return Math.max(0.5, Math.min(2, parseFloat(s && s.value) || parseFloat(localStorage.getItem('as_music_playback_rate') || '1') || 1));
+  }
+  async function exportAtSpeed() {
+    const status = $('exportSpeedStatus');
+    const rate = currentRate();
+    if (Math.abs(rate - 1) < 0.001) {
+      alert('Set speed above or below 1.00× first, then export.');
+      return;
+    }
+    const track = window.__ASMusicCurrentTrack || null;
+    const player = $('localPlayer');
+    const src = (track && track.url) || (player && player.src) || '';
+    if (!src) {
+      alert('Load a track in the player first.');
+      return;
+    }
+    if (status) status.textContent = 'Exporting at ' + rate.toFixed(2) + '×…';
+    const title = (track && (track.title || track.name)) || 'track';
+
+    try {
+      // Prefer server ffmpeg atempo (best quality, real duration change)
+      let res;
+      if (src.startsWith('blob:')) {
+        // Fetch blob and send as multipart
+        const blob = await fetch(src).then((r) => r.blob());
+        const fd = new FormData();
+        fd.append('file', blob, title + '.mp3');
+        fd.append('rate', String(rate));
+        res = await fetch('/api/music/export-speed', { method: 'POST', body: fd });
+      } else {
+        // Path relative to music public
+        let path = src;
+        try {
+          const u = new URL(src, location.origin);
+          path = u.pathname;
+        } catch (_) {}
+        res = await fetch('/api/music/export-speed', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: path, rate: rate, title: title })
+        });
+      }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(err.error || 'Export failed');
+      }
+      const out = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(out);
+      a.download = title.replace(/[^\w\-]+/g, '_') + '_' + rate.toFixed(2) + 'x.mp3';
+      a.click();
+      if (status) status.textContent = 'Downloaded ' + a.download;
+      // Optionally add to library
+      try {
+        const fd2 = new FormData();
+        fd2.append('file', out, a.download);
+        await fetch('/api/music/upload', { method: 'POST', body: fd2 });
+        if (typeof window.refreshMusicLibrary === 'function') window.refreshMusicLibrary();
+      } catch (_) {}
+    } catch (e) {
+      console.warn('Server speed export failed, trying offline fallback', e);
+      // Offline fallback: OfflineAudioContext time-stretch approximation via playback rate render
+      try {
+        const abuf = await (async () => {
+          const arr = await fetch(src).then((r) => r.arrayBuffer());
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const decoded = await ctx.decodeAudioData(arr.slice(0));
+          ctx.close();
+          return decoded;
+        })();
+        const newLen = Math.ceil(abuf.length / rate);
+        const offline = new OfflineAudioContext(abuf.numberOfChannels, newLen, abuf.sampleRate);
+        const srcNode = offline.createBufferSource();
+        srcNode.buffer = abuf;
+        srcNode.playbackRate.value = rate;
+        srcNode.connect(offline.destination);
+        srcNode.start(0);
+        const rendered = await offline.startRendering();
+        // Encode WAV
+        const ch = rendered.numberOfChannels;
+        const len = rendered.length;
+        const wav = new ArrayBuffer(44 + len * ch * 2);
+        const view = new DataView(wav);
+        const wstr = (o, str) => { for (let i = 0; i < str.length; i++) view.setUint8(o + i, str.charCodeAt(i)); };
+        wstr(0, 'RIFF'); view.setUint32(4, 36 + len * ch * 2, true); wstr(8, 'WAVE'); wstr(12, 'fmt ');
+        view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, ch, true);
+        view.setUint32(24, rendered.sampleRate, true); view.setUint32(28, rendered.sampleRate * ch * 2, true);
+        view.setUint16(32, ch * 2, true); view.setUint16(34, 16, true); wstr(36, 'data');
+        view.setUint32(40, len * ch * 2, true);
+        let off = 44;
+        for (let i = 0; i < len; i++) {
+          for (let c = 0; c < ch; c++) {
+            let s = Math.max(-1, Math.min(1, rendered.getChannelData(c)[i]));
+            view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+            off += 2;
+          }
+        }
+        const blob = new Blob([wav], { type: 'audio/wav' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = title.replace(/[^\w\-]+/g, '_') + '_' + rate.toFixed(2) + 'x.wav';
+        a.click();
+        if (status) status.textContent = 'Downloaded (browser fallback) ' + a.download;
+      } catch (e2) {
+        if (status) status.textContent = 'Export failed: ' + (e.message || e2.message);
+        alert('Could not export: ' + (e.message || e2.message));
+      }
+    }
+  }
+  function boot() {
+    const btn = $('btnExportSpeed');
+    if (btn) btn.onclick = exportAtSpeed;
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
 })();

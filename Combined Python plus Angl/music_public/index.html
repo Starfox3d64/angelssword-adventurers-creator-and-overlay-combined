@@ -96,6 +96,17 @@
           <div class="card">
             <h3 id="playerTitle">No track selected</h3>
             <audio id="localPlayer" controls style="width:100%"></audio>
+            <div class="row" style="margin-top:10px;align-items:center;gap:10px;flex-wrap:wrap">
+              <label class="dim" for="playbackRate">Speed</label>
+              <input type="range" id="playbackRate" min="0.5" max="2" step="0.05" value="1" title="Playback speed" style="flex:1;min-width:120px;accent-color:var(--as-accent,#c9a227)" />
+              <span id="playbackRateVal" style="color:var(--as-accent);min-width:3rem;font-weight:600">1.00×</span>
+              <button type="button" class="btn sm" id="rateSlower" title="Slower">−</button>
+              <button type="button" class="btn sm" id="rateFaster" title="Faster">+</button>
+              <button type="button" class="btn sm" id="rateReset" title="Reset to 1×">1×</button>
+              <button type="button" class="btn sm primary" id="btnExportSpeed" title="Download a permanent copy at this speed">⬇ Export at speed</button>
+            </div>
+            <p class="dim small" id="exportSpeedStatus" style="margin-top:4px"></p>
+            <p class="dim small" style="margin-top:6px">Playback rate applies to the player and to Global BGM when set.</p>
             <div class="row" style="margin-top:12px">
               <button class="btn primary" id="btnSetGlobal">🌐 Set as Active Global BGM</button>
               <button class="btn" id="btnLoop">Loop: On</button>
