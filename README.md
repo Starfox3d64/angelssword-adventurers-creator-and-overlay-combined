@@ -22,7 +22,7 @@ Python Combined Edition · **v2.5.1** · July 2026
 | **🌸 AnimeGen T2V** | `/animegen` | AideaLab anime video (Wan 2.2) via ComfyUI or Diffusers |
 | **🧱 Tetris** | `/tetris` | Theme-aware Tetris with difficulty, speed, hold, ghost |
 
-Every suite has **suite navigation**, **session notes** (📌), and the **global music mini-player** when BGM is active.
+Every suite has **suite navigation**, **session notes** (📌), the **global music mini-player** when BGM is active, and **?** / **F1** shortcuts help.
 
 ---
 
