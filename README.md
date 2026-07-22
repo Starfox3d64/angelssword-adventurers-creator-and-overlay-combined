@@ -3,8 +3,8 @@
 **Overlay · Creator · Live2D · Music · AnimeGen · Tetris** — one local Python app.
 
 **Made by TheDonOfEverything aka Paul Conforti**  
-Original JavaScript by **Leaflit** · Angular v0.3.0 by **OOzeClues**  
-Python Combined Edition · **v2.5** · July 2026
+Original JavaScript by **Leaflit** · Angular Edition by **OOzeClues** (**v0.3.0 → v0.4.0** features)  
+Python Combined Edition · **v2.5.1** · July 2026
 
 > Runs 100% on your PC. No Node.js required.
 
@@ -80,6 +80,23 @@ Floating **📌** button on Models, Music, AnimeGen, Tetris (Creator & Overlay h
 
 ### Suite navigation
 Header links on every page: Menu · Creator · Overlay · Models · Music · AnimeGen · Tetris.
+
+---
+
+## Angular 0.4.0 feature parity
+
+Ported from **Angel's Sword Adventurer Creator – Angular Edition 0.4.0** (OOzeClues):
+
+| Feature | Status |
+|---------|--------|
+| WebGPU capability detection | ✅ Settings status |
+| GPU / RGBA WebM export (raw frames → ffmpeg) | ✅ Creator → Settings |
+| CPU / PNG export (default) | ✅ |
+| ffmpeg ensure / version log (not bundled in zip) | ✅ |
+| Music playback speed 0.5×–2× | ✅ |
+| **Export audio at current speed** | ✅ Music → Player |
+
+> Full WebGPU *preview chroma* shader path remains CPU-based; export quality path matches 0.4.0.
 
 ---
 
@@ -209,7 +226,7 @@ pip install -r requirements.txt
 
 - **TheDonOfEverything (Paul Conforti)** — Python combined edition, suites, themes, Tetris, integration  
 - **Leaflit** — original Adventurer JavaScript  
-- **OOzeClues** — Angular Edition v0.3.0  
+- **OOzeClues** — Angular Edition **v0.3.0 → v0.4.0** (WebGPU detect, GPU/RGBA export path, ffmpeg ensure)  
 - **AideaLab / AnimeGen** — T2V model (ethical studio data, Wan 2.2 lineage)  
 
 ---
