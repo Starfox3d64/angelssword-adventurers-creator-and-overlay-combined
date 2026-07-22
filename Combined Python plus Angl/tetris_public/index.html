@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Tetris — Don's Adventurer</title>
+<link rel="stylesheet" href="/shared/theme.css"/>
+<style>
+  body{margin:0;background:var(--as-bg);color:var(--as-text);font-family:system-ui,sans-serif;min-height:100vh}
+  .wrap{max-width:520px;margin:20px auto;padding:16px;text-align:center}
+  h1{color:var(--as-accent);margin:0 0 8px}
+  .sub{color:var(--as-muted);font-size:.85rem;margin-bottom:12px}
+  canvas{background:#000;border:2px solid var(--as-border);border-radius:8px;image-rendering:pixelated;max-width:100%}
+  .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:10px 0}
+  button{background:var(--as-panel);color:var(--as-accent);border:1px solid var(--as-border);border-radius:8px;padding:8px 14px;cursor:pointer}
+  button:hover{background:var(--as-accent-2);color:#fff}
+  #score{color:var(--as-accent);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Tetris</h1>
+  <div class="sub">Theme-aware · Arrow keys move · Up rotate · Space hard drop</div>
+  <canvas id="c" width="240" height="480"></canvas>
+  <div class="row"><span>Score: <span id="score">0</span></span><span>Lines: <span id="lines">0</span></span></div>
+  <div class="row">
+    <button id="start">Start / Restart</button>
+    <button id="pause">Pause</button>
+    <a href="/" style="color:var(--as-accent)">← Menu</a>
+  </div>
+</div>
+<script src="/shared/theme-nav.js"></script>
+<script src="/shared/global-player.js"></script>
+<script src="tetris.js"></script>
+</body>
+</html>
