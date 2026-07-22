@@ -68,8 +68,8 @@
         <div class="viewport-toolbar">
           <button class="btn sm active-mode" id="btnModeLive2D" type="button" title="Live2D model mode">🎭 Live2D</button>
           <button class="btn sm" id="btnModeMedia" type="button" title="Creator media mode">🖼 Media</button>
-          <button type="button" class="btn sm" id="btnScreenshot" data-action="screenshot" title="Save PNG of current view" onclick="event.preventDefault();event.stopPropagation();if(window.__asShot)window.__asShot();return false;">📷 Screenshot</button>
-          <button type="button" class="btn sm" id="btnCopyView" data-action="copyview" title="Copy view to clipboard" onclick="event.preventDefault();event.stopPropagation();if(window.__asCopy)window.__asCopy();return false;">📋 Copy</button>
+          <button type="button" class="btn sm" id="btnScreenshot" data-action="screenshot" title="Save PNG of current view">📷 Screenshot</button>
+          <button type="button" class="btn sm" id="btnCopyView" data-action="copyview" title="Copy view to clipboard">📋 Copy</button>
           <span class="spacer"></span>
 
           <button class="btn sm" id="btnCenter" title="Center model">◎ Center</button>
@@ -425,37 +425,36 @@
 
 
 
-  <script src="/live2d/app.js?v=23"></script>
+  <script src="/live2d/app.js?v=24"></script>
 
 <script>
-/* CAPTURE v4 — WYSIWYG (respects Media Tweak transforms) + quiet clipboard fallback */
+/* CAPTURE v5 — fixed syntax, WYSIWYG transforms */
 (function () {
   function byId(id) { return document.getElementById(id); }
 
   function status(msg) {
-    var s = byId('stModel');
+    var s = byId("stModel");
     if (s) s.textContent = msg;
-    console.log('[capture]', msg);
+    console.log("[capture]", msg);
   }
 
   function tweak() {
     return {
-      scale: parseFloat((byId('mediaScale') && byId('mediaScale').value) || '1') || 1,
-      x: parseFloat((byId('mediaX') && byId('mediaX').value) || '0') || 0,
-      y: parseFloat((byId('mediaY') && byId('mediaY').value) || '0') || 0,
-      rot: parseFloat((byId('mediaRot') && byId('mediaRot').value) || '0') || 0,
-      op: parseFloat((byId('mediaOp') && byId('mediaOp').value) || '1') || 1
+      scale: parseFloat((byId("mediaScale") && byId("mediaScale").value) || "1") || 1,
+      x: parseFloat((byId("mediaX") && byId("mediaX").value) || "0") || 0,
+      y: parseFloat((byId("mediaY") && byId("mediaY").value) || "0") || 0,
+      rot: parseFloat((byId("mediaRot") && byId("mediaRot").value) || "0") || 0,
+      op: parseFloat((byId("mediaOp") && byId("mediaOp").value) || "1") || 1
     };
   }
 
-  /** Draw image/video into canvas WITH current Media Tweak transforms (WYSIWYG). */
   function compositeMedia() {
-    var img = byId('mediaImage');
-    var vid = byId('mediaVideo');
+    var img = byId("mediaImage");
+    var vid = byId("mediaVideo");
     var srcEl = null;
     var sw = 0, sh = 0;
 
-    if (vid && !vid.classList.contains('hidden') && vid.style.display !== 'none' && vid.videoWidth > 0) {
+    if (vid && !vid.classList.contains("hidden") && vid.style.display !== "none" && vid.videoWidth > 0) {
       srcEl = vid;
       sw = vid.videoWidth;
       sh = vid.videoHeight;
@@ -467,34 +466,31 @@
     if (!srcEl || !sw || !sh) return null;
 
     var t = tweak();
-    // Output size: large enough for rotation + offset
-    var pad = Math.ceil(Math.sqrt(sw * sw + sh * sh) * Math.max(t.scale, 1) + Math.abs(t.x) + Math.abs(t.y) + 4);
-    var cw = Math.max(sw, pad);
-    var ch = Math.max(sh, pad);
-    // Prefer viewport size if available for "what you see"
-    var vp = byId('viewport') || byId('mediaStage');
+    var diag = Math.ceil(Math.sqrt(sw * sw + sh * sh) * Math.max(t.scale, 1) + Math.abs(t.x) + Math.abs(t.y) + 8);
+    var cw = Math.max(sw, diag);
+    var ch = Math.max(sh, diag);
+    var vp = byId("viewport") || byId("mediaStage");
     if (vp && vp.clientWidth > 50 && vp.clientHeight > 50) {
       cw = Math.max(cw, vp.clientWidth);
       ch = Math.max(ch, vp.clientHeight);
     }
+    cw = Math.min(cw, 4096);
+    ch = Math.min(ch, 4096);
 
-    var c = document.createElement('canvas');
-    c.width = Math.min(cw, 4096);
-    c.height = Math.min(ch, 4096);
-    var ctx = c.getContext('2d');
-
-    // Transparent background (alpha)
-    ctx.clearRect(0, 0, c.width, c.height);
-
+    var c = document.createElement("canvas");
+    c.width = cw;
+    c.height = ch;
+    var ctx = c.getContext("2d");
+    ctx.clearRect(0, 0, cw, ch);
     ctx.save();
-    ctx.translate(c.width / 2 + t.x, c.height / 2 + t.y);
+    ctx.translate(cw / 2 + t.x, ch / 2 + t.y);
     ctx.rotate((t.rot * Math.PI) / 180);
     ctx.scale(t.scale, t.scale);
     ctx.globalAlpha = Math.max(0, Math.min(1, t.op));
     try {
       ctx.drawImage(srcEl, -sw / 2, -sh / 2, sw, sh);
     } catch (e) {
-      console.error('drawImage failed', e);
+      console.error(e);
       ctx.restore();
       return null;
     }
@@ -504,7 +500,7 @@
 
   function canvasFromPixi() {
     var pixi = window.__ASPixiApp;
-    try { if (!pixi && typeof app !== 'undefined') pixi = app; } catch (e) {}
+    try { if (!pixi && typeof app !== "undefined") pixi = app; } catch (e) {}
     if (!pixi || !pixi.renderer) return null;
     try {
       pixi.renderer.render(pixi.stage);
@@ -512,19 +508,19 @@
       if (r.extract && r.extract.canvas) return r.extract.canvas(pixi.stage);
       if (r.plugins && r.plugins.extract) return r.plugins.extract.canvas(pixi.stage);
     } catch (e) {
-      console.warn('pixi extract', e);
+      console.warn(e);
     }
     return null;
   }
 
   function canvasFromWebGL() {
-    var canvas = byId('live2dCanvas');
+    var canvas = byId("live2dCanvas");
     if (!canvas || !canvas.width) return null;
     try {
-      var out = document.createElement('canvas');
+      var out = document.createElement("canvas");
       out.width = canvas.width;
       out.height = canvas.height;
-      out.getContext('2d').drawImage(canvas, 0, 0);
+      out.getContext("2d").drawImage(canvas, 0, 0);
       return out;
     } catch (e) {
       return canvas;
@@ -532,56 +528,50 @@
   }
 
   function grab() {
-    // Prefer transformed media composite when media is loaded
-    var img = byId('mediaImage');
-    var vid = byId('mediaVideo');
+    var img = byId("mediaImage");
+    var vid = byId("mediaVideo");
     var hasMedia = (img && img.src) || (vid && (vid.src || vid.currentSrc) && vid.videoWidth);
     if (hasMedia) {
       var cm = compositeMedia();
       if (cm && cm.width) {
-        status('Captured view ' + cm.width + 'x' + cm.height + ' (with transforms)');
+        status("Captured " + cm.width + "x" + cm.height + " with transforms");
         return cm;
       }
     }
     var cp = canvasFromPixi();
     if (cp && cp.width) {
-      status('Captured Live2D ' + cp.width + 'x' + cp.height);
+      status("Captured Live2D " + cp.width + "x" + cp.height);
       return cp;
     }
     var cw = canvasFromWebGL();
     if (cw && cw.width) {
-      status('Captured canvas ' + cw.width + 'x' + cw.height);
+      status("Captured canvas " + cw.width + "x" + cw.height);
       return cw;
     }
     return null;
   }
 
   function downloadCanvas(c) {
-    var url = c.toDataURL('image/png');
-    var a = document.createElement('a');
-    a.download = 'as-view-' + Date.now() + '.png';
-    a.href = url;
-    a.style.display = 'none';
+    var a = document.createElement("a");
+    a.download = "as-view-" + Date.now() + ".png";
+    a.href = c.toDataURL("image/png");
     document.body.appendChild(a);
     a.click();
-    setTimeout(function () { a.remove(); }, 400);
-    status('Saved transformed view PNG');
+    setTimeout(function () { a.remove(); }, 300);
+    status("PNG download started");
   }
 
   function shot() {
     try {
       var c = grab();
       if (!c || !c.width) {
-        alert('Nothing to capture yet.
-
-• Media: open an image/video and adjust sliders if you want
-• Live2D: load a .model3.json package');
+        alert("Nothing to capture yet. Open an image/video in Media mode, or load a Live2D model.");
         return;
       }
       downloadCanvas(c);
     } catch (e) {
       console.error(e);
-      alert('Screenshot failed: ' + e.message);
+      alert("Screenshot failed: " + e.message);
     }
   }
 
@@ -589,7 +579,7 @@
     try {
       var c = grab();
       if (!c || !c.width) {
-        alert('Nothing to capture yet. Load media or a model first.');
+        alert("Nothing to capture yet. Open media or load a model first.");
         return;
       }
       c.toBlob(function (blob) {
@@ -598,24 +588,19 @@
           return;
         }
         if (navigator.clipboard && window.ClipboardItem) {
-          navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
-            .then(function () {
-              status('Copied transformed view');
-              // Quiet success — no alert spam
-            })
+          navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
+            .then(function () { status("Copied to clipboard"); })
             .catch(function () {
-              // Clipboard often blocked on http://localhost in some browsers — just download
               downloadCanvas(c);
-              status('Clipboard unavailable — downloaded PNG instead');
+              status("Clipboard unavailable — downloaded PNG instead");
             });
         } else {
           downloadCanvas(c);
-          status('Downloaded PNG (no clipboard API)');
         }
-      }, 'image/png');
+      }, "image/png");
     } catch (e) {
       console.error(e);
-      alert('Copy failed: ' + e.message);
+      alert("Copy failed: " + e.message);
     }
   }
 
@@ -623,19 +608,32 @@
   window.__asCopy = copy;
   window.__ASForceCapture = { shot: shot, copy: copy, grab: grab };
 
-  function wireAll() {
-    document.querySelectorAll('#btnScreenshot, #btnScreenshotMediaTab, [data-action="screenshot"]').forEach(function (b) {
-      b.onclick = function (e) { e.preventDefault(); e.stopPropagation(); shot(); return false; };
-    });
-    document.querySelectorAll('#btnCopyView, #btnCopyMediaTab, [data-action="copyview"]').forEach(function (b) {
-      b.onclick = function (e) { e.preventDefault(); e.stopPropagation(); copy(); return false; };
-    });
+  function wire() {
+    var list = document.querySelectorAll("#btnScreenshot, #btnScreenshotMediaTab, #btnCopyView, #btnCopyMediaTab, [data-action=screenshot], [data-action=copyview]");
+    for (var i = 0; i < list.length; i++) {
+      (function (btn) {
+        btn.onclick = function (e) {
+          if (e) { e.preventDefault(); e.stopPropagation(); }
+          var id = btn.id || "";
+          var act = btn.getAttribute("data-action") || "";
+          if (id.indexOf("Copy") >= 0 || act === "copyview") copy();
+          else shot();
+          return false;
+        };
+      })(list[i]);
+    }
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wireAll);
-  else wireAll();
-  setInterval(wireAll, 1500);
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wire);
+  else wire();
+  setInterval(wire, 1000);
+
+  console.log("[capture] v5 ready — window.__asShot / window.__asCopy");
 })();
 </script>
+
+
+
 
 
 
