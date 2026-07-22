@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⚔ Don's Adventurer — AnimeGen T2V</title>
+  <base href="/animegen/" />
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Outfit:wght@300;400;600&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-icon">🌸</span>
+        <div>
+          <div class="brand-title">AnimeGen T2V</div>
+          <div class="brand-sub">AideaLab × Japan · Wan 2.2 based · Ethical studio data</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <a class="btn ghost" href="/">🏠 Menu</a>
+        <a class="btn ghost" href="/creator">🎨 Creator</a>
+        <a class="btn ghost" href="/music">🎵 Music</a>
+        <a class="btn ghost" href="https://huggingface.co/aidealab/AnimeGen-T2V" target="_blank" rel="noopener">🤗 Model Card</a>
+      </div>
+    </header>
+
+    <div class="status-bar">
+      <span id="stBackend">Backend: …</span>
+      <span>•</span>
+      <span id="stCuda">CUDA: …</span>
+      <span>•</span>
+      <span id="stModels">Weights: …</span>
+      <span class="grow"></span>
+      <span id="stClock">--:--</span>
+    </div>
+
+    <div class="workspace">
+      <aside class="panel">
+        <div class="panel-head">ℹ️ About</div>
+        <div class="pad dim small">
+          <p><strong>AnimeGen-T2V</strong> is an anime video model from AideaLab with the Japanese government, trained on ethically sourced studio data, built on <strong>Wan 2.2</strong>.</p>
+          <p style="margin-top:8px">Best results: Wan-style Chinese negatives + prompt in <strong>Japanese</strong> (English works via interpreter layer but Japanese is more accurate).</p>
+          <p style="margin-top:8px">Great for Adventurer <strong>idle loops &amp; transitions</strong> via local gen or ComfyUI.</p>
+        </div>
+
+        <div class="panel-head">⚙️ Backend</div>
+        <div class="pad">
+          <label>Generation backend</label>
+          <select id="backend">
+            <option value="comfyui">ComfyUI (recommended)</option>
+            <option value="diffusers">Local Diffusers (CUDA, heavy)</option>
+          </select>
+          <label>ComfyUI URL</label>
+          <input type="text" id="comfyUrl" value="http://127.0.0.1:8188" />
+          <button class="btn block" id="btnCheck">Test Connection</button>
+          <div id="backendStatus" class="status"></div>
+        </div>
+
+        <div class="panel-head">📦 Model files</div>
+        <div class="pad dim small">
+          Place in <code>animegen_public/models/</code>:
+          <ul style="margin:6px 0 0 16px">
+            <li><code>high_noise.safetensors</code></li>
+            <li><code>low_noise.safetensors</code></li>
+          </ul>
+          <a class="btn sm" style="margin-top:8px;display:inline-flex" href="https://huggingface.co/aidealab/AnimeGen-T2V/resolve/main/high_noise.safetensors" target="_blank">Download high_noise</a>
+          <a class="btn sm" style="margin-top:8px;display:inline-flex" href="https://huggingface.co/aidealab/AnimeGen-T2V" target="_blank">HF repo</a>
+          <p style="margin-top:8px">Also needs Wan 2.2 base (Diffusers path) or matching ComfyUI Wan nodes + Lightning LoRAs.</p>
+        </div>
+      </aside>
+
+      <main class="main">
+        <div class="card">
+          <div class="row">
+            <label class="grow">Prompt
+              <textarea id="prompt" rows="4" placeholder="A character standing in a neutral idle pose, subtle breathing, seamless loop, solid background…"></textarea>
+            </label>
+          </div>
+          <div class="row">
+            <label class="grow">Japanese prompt (recommended)
+              <textarea id="promptJa" rows="3" placeholder="Optional — if empty, English prompt is prefixed with “Japanese anime style,”"></textarea>
+            </label>
+          </div>
+          <div class="row">
+            <label class="grow">Negative prompt
+              <textarea id="negative" rows="2">3d, cg, photo, stop, wait, low quality, blurry, deformed</textarea>
+            </label>
+          </div>
+          <div class="row">
+            <label>Width <input type="number" id="width" value="832" min="256" max="1280" step="16" class="num" /></label>
+            <label>Height <input type="number" id="height" value="480" min="256" max="720" step="16" class="num" /></label>
+            <label>Seconds <input type="number" id="secs" value="5" min="1" max="10" step="1" class="num" /></label>
+            <label>Seed <input type="number" id="seed" value="42" class="num" /></label>
+            <label>Steps <input type="number" id="steps" value="8" min="4" max="30" class="num" /></label>
+            <label>CFG <input type="number" id="cfg" value="1" min="1" max="7" step="0.5" class="num" /></label>
+          </div>
+          <div class="row">
+            <button class="btn sm" data-preset="idle">Idle loop</button>
+            <button class="btn sm" data-preset="wave">Wave hello</button>
+            <button class="btn sm" data-preset="talk">Talking</button>
+            <button class="btn sm" data-preset="walk">Walk cycle</button>
+            <label class="chk"><input type="checkbox" id="prefixAnime" checked /> Prefix “Japanese anime style,”</label>
+            <label class="chk"><input type="checkbox" id="sendToCreator" checked /> Offer handoff to Creator after export</label>
+          </div>
+          <div class="row">
+            <button class="btn primary" id="btnGenerate">✨ Generate Anime Video</button>
+            <button class="btn" id="btnCancel">Cancel</button>
+          </div>
+          <div class="progress hidden" id="progress"><div class="fill" id="fill"></div></div>
+          <div id="genStatus" class="status"></div>
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <div class="panel-head" style="border:none;padding:0 0 8px">Preview &amp; outputs</div>
+          <video id="preview" controls playsinline style="width:100%;max-height:420px;background:#000;border-radius:8px"></video>
+          <div class="row" style="margin-top:10px">
+            <button class="btn" id="btnDownload">Download MP4</button>
+            <button class="btn primary" id="btnToCreator">→ Send to Creator (Video Prep)</button>
+            <button class="btn" id="btnRefreshOut">↻ Refresh outputs</button>
+          </div>
+          <div id="outputList" class="lib-list"></div>
+        </div>
+      </main>
+    </div>
+  </div>
+  <script src="/shared/global-player.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
