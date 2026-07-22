@@ -68,8 +68,8 @@
         <div class="viewport-toolbar">
           <button class="btn sm active-mode" id="btnModeLive2D" type="button" title="Live2D model mode">🎭 Live2D</button>
           <button class="btn sm" id="btnModeMedia" type="button" title="Creator media mode">🖼 Media</button>
-          <button type="button" class="btn sm" id="btnScreenshot" data-action="screenshot" title="Save PNG of current view">📷 Screenshot</button>
-          <button type="button" class="btn sm" id="btnCopyView" data-action="copyview" title="Copy view to clipboard">📋 Copy</button>
+          <button type="button" class="btn sm" id="btnScreenshot" data-action="screenshot" title="Save PNG of current view" onclick="event.preventDefault();event.stopPropagation();if(window.__asShot)window.__asShot();return false;">📷 Screenshot</button>
+          <button type="button" class="btn sm" id="btnCopyView" data-action="copyview" title="Copy view to clipboard" onclick="event.preventDefault();event.stopPropagation();if(window.__asCopy)window.__asCopy();return false;">📋 Copy</button>
           <span class="spacer"></span>
 
           <button class="btn sm" id="btnCenter" title="Center model">◎ Center</button>
@@ -144,6 +144,8 @@
             <input type="file" id="mediaFileInput" accept="image/*,video/*,.png,.jpg,.jpeg,.webp,.gif,.webm,.mp4,.mov" style="display:none" />
             <button type="button" class="btn primary sm" id="btnMediaPick">📁 Open Image / Video</button>
             <button type="button" class="btn sm" id="btnMediaPickVideo">🎬 Open Video</button>
+            <button type="button" class="btn sm" id="btnScreenshotMediaTab" onclick="event.preventDefault();if(window.__asShot)window.__asShot();return false;">📷 Screenshot</button>
+            <button type="button" class="btn sm" id="btnCopyMediaTab" onclick="event.preventDefault();if(window.__asCopy)window.__asCopy();return false;">📋 Copy</button>
           </div>
           <p id="mediaTabTip" class="small dim" style="margin:0 0 10px;line-height:1.4">
             Drag an image/video into the center viewer works too. Use the sliders below for scale, offset, rotation, and opacity.
@@ -423,213 +425,247 @@
 
 
 
-  <script src="/live2d/app.js?v=21"></script>
+  <script src="/live2d/app.js?v=22"></script>
 
 <script>
-/* FORCE CAPTURE — self-contained, does not depend on app.js */
+/* CAPTURE v3 — assigns window.__asShot / window.__asCopy before anything else can fail */
 (function () {
-  function el(id) { return document.getElementById(id); }
+  function byId(id) { return document.getElementById(id); }
 
-  function isMediaMode() {
-    var stage = el('mediaStage');
-    var medBtn = el('btnModeMedia');
-    if (medBtn && medBtn.classList.contains('active-mode')) return true;
-    if (stage && !stage.classList.contains('hidden') && stage.style.display !== 'none') {
-      var img = el('mediaImage');
-      var vid = el('mediaVideo');
-      if (img && img.src && !img.classList.contains('hidden')) return true;
-      if (vid && (vid.src || vid.currentSrc) && !vid.classList.contains('hidden')) return true;
-    }
-    return false;
+  function status(msg) {
+    var s = byId('stModel');
+    if (s) s.textContent = msg;
+    console.log('[capture]', msg);
   }
 
-  function grabMedia() {
-    var img = el('mediaImage');
-    var vid = el('mediaVideo');
+  function canvasFromImage(img) {
+    if (!img || !img.src) return null;
+    var w = img.naturalWidth || img.width || img.clientWidth;
+    var h = img.naturalHeight || img.height || img.clientHeight;
+    if (!w || !h) return null;
     var c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
     var ctx = c.getContext('2d');
-    // Prefer video if visible and has frames
-    if (vid && !vid.classList.contains('hidden') && vid.style.display !== 'none' && vid.videoWidth > 0) {
-      c.width = vid.videoWidth;
-      c.height = vid.videoHeight;
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, 0, c.width, c.height);
-      ctx.drawImage(vid, 0, 0);
-      return c;
-    }
-    if (img && img.src) {
-      // Wait if not decoded
-      var w = img.naturalWidth || img.width;
-      var h = img.naturalHeight || img.height;
-      if (!w || !h) {
-        // try drawing anyway at display size
-        w = img.clientWidth || 512;
-        h = img.clientHeight || 512;
-      }
-      c.width = w;
-      c.height = h;
-      try {
-        ctx.drawImage(img, 0, 0, w, h);
-        return c;
-      } catch (err) {
-        console.error('drawImage img', err);
-        return null;
-      }
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+    return c;
+  }
+
+  function canvasFromVideo(vid) {
+    if (!vid) return null;
+    var w = vid.videoWidth, h = vid.videoHeight;
+    if (!w || !h) return null;
+    var c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(vid, 0, 0, w, h);
+    return c;
+  }
+
+  function canvasFromPixi() {
+    var pixi = window.__ASPixiApp;
+    try {
+      if (!pixi && typeof app !== 'undefined') pixi = app;
+    } catch (e) {}
+    if (!pixi || !pixi.renderer) return null;
+    try {
+      pixi.renderer.render(pixi.stage);
+      var r = pixi.renderer;
+      if (r.extract && r.extract.canvas) return r.extract.canvas(pixi.stage);
+      if (r.plugins && r.plugins.extract) return r.plugins.extract.canvas(pixi.stage);
+    } catch (e) {
+      console.warn('pixi extract', e);
     }
     return null;
   }
 
-  function grabLive2D() {
-    // PIXI global from app.js (var app / window)
-    var pixiApp = null;
+  function canvasFromWebGL() {
+    var canvas = byId('live2dCanvas');
+    if (!canvas || !canvas.width) return null;
     try {
-      if (typeof app !== 'undefined' && app && app.renderer) pixiApp = app;
-    } catch (_) {}
-    if (!pixiApp && window.__ASPixiApp) pixiApp = window.__ASPixiApp;
-
-    if (pixiApp && pixiApp.renderer) {
-      try {
-        try { pixiApp.renderer.render(pixiApp.stage); } catch (_) {}
-        var r = pixiApp.renderer;
-        if (r.extract && typeof r.extract.canvas === 'function') {
-          return r.extract.canvas(pixiApp.stage);
-        }
-        if (r.plugins && r.plugins.extract && r.plugins.extract.canvas) {
-          return r.plugins.extract.canvas(pixiApp.stage);
-        }
-      } catch (e) {
-        console.warn('pixi extract', e);
-      }
-    }
-
-    var canvas = el('live2dCanvas');
-    if (canvas && canvas.width > 0) {
       var out = document.createElement('canvas');
       out.width = canvas.width;
       out.height = canvas.height;
+      out.getContext('2d').drawImage(canvas, 0, 0);
+      // Detect blank (all transparent/black) — still return; user can see
+      return out;
+    } catch (e) {
+      // WebGL tainted or blocked — try toDataURL on original
       try {
-        out.getContext('2d').drawImage(canvas, 0, 0);
-        return out;
-      } catch (e2) {
-        console.warn('canvas draw', e2);
-        // Last resort: use the canvas element itself via toDataURL
-        return canvas;
-      }
+        var u = canvas.toDataURL('image/png');
+        if (u && u.length > 100) {
+          var im = new Image();
+          // sync path not available; return canvas anyway
+        }
+      } catch (e2) {}
+      return canvas;
     }
-    return null;
   }
 
   function grab() {
-    if (isMediaMode()) {
-      var m = grabMedia();
-      if (m) return m;
+    // 1. Media image (ignore hidden class if src set — style may show it)
+    var img = byId('mediaImage');
+    if (img && img.src && img.src !== window.location.href) {
+      var ci = canvasFromImage(img);
+      if (ci) { status('Captured media image ' + ci.width + 'x' + ci.height); return ci; }
     }
-    return grabLive2D();
+    // 2. Media video
+    var vid = byId('mediaVideo');
+    if (vid && (vid.src || vid.currentSrc) && vid.videoWidth) {
+      var cv = canvasFromVideo(vid);
+      if (cv) { status('Captured video frame ' + cv.width + 'x' + cv.height); return cv; }
+    }
+    // 3. PIXI stage
+    var cp = canvasFromPixi();
+    if (cp && cp.width) { status('Captured Live2D (PIXI) ' + cp.width + 'x' + cp.height); return cp; }
+    // 4. Raw canvas
+    var cw = canvasFromWebGL();
+    if (cw && cw.width) { status('Captured canvas ' + cw.width + 'x' + cw.height); return cw; }
+    return null;
   }
 
-  function doScreenshot() {
-    try {
-      var c = grab();
-      if (!c) {
-        alert('Nothing to capture.
-1) Switch to Media and open an image/video, OR
-2) Load a Live2D .model3.json package.');
-        return;
-      }
-      var url = c.toDataURL('image/png');
+  function downloadCanvas(c) {
+    var url = c.toDataURL('image/png');
+    var a = document.createElement('a');
+    a.download = 'as-capture-' + Date.now() + '.png';
+    a.href = url;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { a.remove(); }, 500);
+    status('Download started');
+  }
+
+
+  function downloadFromUrl(url, name) {
+    return fetch(url).then(function (res) { return res.blob(); }).then(function (blob) {
       var a = document.createElement('a');
-      a.href = url;
-      a.download = 'as-capture-' + Date.now() + '.png';
+      a.href = URL.createObjectURL(blob);
+      a.download = name || ('as-capture-' + Date.now() + '.png');
       document.body.appendChild(a);
       a.click();
       a.remove();
-    } catch (e) {
-      alert('Screenshot error: ' + e.message);
-      console.error(e);
-    }
-  }
-
-  function doCopy() {
-    try {
-      var c = grab();
-      if (!c) {
-        alert('Nothing to capture. Load media or a model first.');
-        return;
+      status('Download started');
+      return true;
+    }).catch(function () {
+      try {
+        var a2 = document.createElement('a');
+        a2.href = url;
+        a2.download = name || ('as-capture-' + Date.now() + '.png');
+        document.body.appendChild(a2);
+        a2.click();
+        a2.remove();
+        status('Download started');
+        return true;
+      } catch (e2) {
+        return false;
       }
-      c.toBlob(function (blob) {
-        if (!blob) {
-          // fallback download
-          doScreenshot();
-          return;
-        }
-        if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
-          navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
-            .then(function () { alert('Copied to clipboard'); })
-            .catch(function () {
-              var a = document.createElement('a');
-              a.href = URL.createObjectURL(blob);
-              a.download = 'as-capture-' + Date.now() + '.png';
-              a.click();
-              alert('Clipboard blocked — file downloaded instead');
-            });
-        } else {
-          var a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = 'as-capture-' + Date.now() + '.png';
-          a.click();
-          alert('Downloaded PNG (clipboard API not available)');
-        }
-      }, 'image/png');
-    } catch (e) {
-      alert('Copy error: ' + e.message);
-      console.error(e);
-    }
-  }
-
-  window.__ASForceCapture = { shot: doScreenshot, copy: doCopy, grab: grab };
-
-  function wire() {
-    // Direct bind every matching control
-    ['btnScreenshot', 'btnCopyView'].forEach(function (id) {
-      var nodes = document.querySelectorAll('#' + id);
-      nodes.forEach(function (btn) {
-        btn.onclick = function (e) {
-          e.preventDefault();
-          e.stopPropagation();
-          if (id === 'btnCopyView') doCopy();
-          else doScreenshot();
-        };
-      });
     });
   }
 
-  // Capture phase: win even if something else stops the event
-  document.addEventListener('click', function (e) {
-    var t = e.target;
-    if (!t) return;
-    var btn = t.closest ? t.closest('#btnScreenshot, #btnCopyView, [data-action="screenshot"], [data-action="copyview"]') : null;
-    if (!btn) {
-      // also match by text content as last resort
-      if (t.tagName === 'BUTTON' && (t.textContent || '').indexOf('Screenshot') >= 0) btn = t;
-      if (t.tagName === 'BUTTON' && (t.textContent || '').indexOf('📋') >= 0) btn = t;
-      if (t.tagName === 'BUTTON' && (t.textContent || '').indexOf('📷') >= 0) btn = t;
+  function shot() {
+    try {
+      var img = byId('mediaImage');
+      if (img && img.src && img.src !== location.href && img.src.indexOf('data:') !== 0) {
+        // Direct export of the loaded media file (most reliable)
+        downloadFromUrl(img.src, 'as-media-' + Date.now() + '.png').then(function (ok) {
+          if (ok === false) {
+            try {
+              var c = canvasFromImage(img);
+              if (c) downloadCanvas(c);
+              else alert('Could not export image');
+            } catch (e) { alert('Export failed: ' + e.message); }
+          }
+        });
+        return;
+      }
+      if (img && img.src && img.src.indexOf('data:') === 0) {
+        var a = document.createElement('a');
+        a.href = img.src;
+        a.download = 'as-media-' + Date.now() + '.png';
+        a.click();
+        return;
+      }
+      var c = grab();
+      if (!c || !c.width) {
+        alert('Nothing to capture yet.\n\n• Media mode: open an image or video first\n• Live2D mode: load a .model3.json package first');
+        return;
+      }
+      downloadCanvas(c);
+    } catch (e) {
+      console.error(e);
+      alert('Screenshot failed: ' + e.message);
     }
-    if (!btn) return;
-    e.preventDefault();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
-    if (btn.id === 'btnCopyView' || (btn.getAttribute && btn.getAttribute('data-action') === 'copyview') || (btn.textContent || '').indexOf('📋') >= 0) {
-      doCopy();
-    } else {
-      doScreenshot();
-    }
-  }, true);
+  }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
-  else wire();
-  setInterval(wire, 2000); // re-bind if toolbar re-creates buttons
+
+  function copy() {
+    try {
+      var img = byId('mediaImage');
+      if (img && img.src && img.src !== location.href) {
+        fetch(img.src).then(function (r) { return r.blob(); }).then(function (blob) {
+          if (navigator.clipboard && window.ClipboardItem) {
+            return navigator.clipboard.write([new ClipboardItem({ [blob.type || 'image/png']: blob })]);
+          }
+          throw new Error('no clipboard');
+        }).then(function () {
+          status('Copied to clipboard');
+          alert('Copied to clipboard');
+        }).catch(function () {
+          shot();
+          alert('Clipboard blocked — download used instead');
+        });
+        return;
+      }
+      var c = grab();
+      if (!c || !c.width) {
+        alert('Nothing to capture yet. Load media or a model first.');
+        return;
+      }
+      c.toBlob(function (blob) {
+        if (!blob) { downloadCanvas(c); return; }
+        if (navigator.clipboard && window.ClipboardItem) {
+          navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+            .then(function () { status('Copied to clipboard'); alert('Copied to clipboard'); })
+            .catch(function () { downloadCanvas(c); alert('Clipboard blocked — PNG downloaded instead'); });
+        } else {
+          downloadCanvas(c);
+          alert('PNG downloaded (clipboard not available)');
+        }
+      }, 'image/png');
+    } catch (e) {
+      console.error(e);
+      alert('Copy failed: ' + e.message);
+    }
+  }
+
+  // Global hooks used by inline onclick
+  window.__asShot = shot;
+  window.__asCopy = copy;
+  window.__ASForceCapture = { shot: shot, copy: copy, grab: grab };
+
+  // Also bind any buttons that appear later (toolbar)
+  function wireAll() {
+    document.querySelectorAll('#btnScreenshot, #btnScreenshotMediaTab, [data-action="screenshot"]').forEach(function (b) {
+      b.onclick = function (e) { e.preventDefault(); e.stopPropagation(); shot(); return false; };
+    });
+    document.querySelectorAll('#btnCopyView, #btnCopyMediaTab, [data-action="copyview"]').forEach(function (b) {
+      b.onclick = function (e) { e.preventDefault(); e.stopPropagation(); copy(); return false; };
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wireAll);
+  else wireAll();
+  setInterval(wireAll, 1500);
 })();
 </script>
+
+
+
 
 <script src="/shared/global-player.js"></script>
 <script src="/shared/theme-nav.js"></script>
