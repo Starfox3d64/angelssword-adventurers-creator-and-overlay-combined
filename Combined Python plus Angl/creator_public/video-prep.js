@@ -950,3 +950,20 @@
     }
 
 })();
+
+
+// AnimeGen / external handoff
+document.addEventListener("DOMContentLoaded", () => {
+  try {
+    const url = localStorage.getItem("as_handoff_video_url");
+    if (!url) return;
+    localStorage.removeItem("as_handoff_video_url");
+    const hint = document.createElement("div");
+    hint.className = "status-msg info";
+    hint.style.margin = "8px 0";
+    hint.innerHTML = "Handoff video from AnimeGen: <a href=\"" + url + "\" target=\"_blank\">" + url + "</a> — download and upload into Video Prep if auto-load is unavailable.";
+    const panel = document.getElementById("tab-video-prep") || document.querySelector(".tab-panel");
+    if (panel) panel.prepend(hint);
+    if (typeof showToast === "function") showToast("AnimeGen video ready — see Video Prep note", "info");
+  } catch (_) {}
+});
