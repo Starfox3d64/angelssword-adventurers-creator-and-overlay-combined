@@ -4,33 +4,50 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Tetris — Don's Adventurer</title>
-<link rel="stylesheet" href="/shared/theme.css"/>
+<link rel="stylesheet" href="/shared/theme.css?v=2"/>
+<script src="/shared/theme-nav.js"></script>
 <style>
-  body{margin:0;background:var(--as-bg);color:var(--as-text);font-family:system-ui,sans-serif;min-height:100vh}
-  .wrap{max-width:520px;margin:20px auto;padding:16px;text-align:center}
-  h1{color:var(--as-accent);margin:0 0 8px}
-  .sub{color:var(--as-muted);font-size:.85rem;margin-bottom:12px}
-  canvas{background:#000;border:2px solid var(--as-border);border-radius:8px;image-rendering:pixelated;max-width:100%}
-  .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:10px 0}
-  button{background:var(--as-panel);color:var(--as-accent);border:1px solid var(--as-border);border-radius:8px;padding:8px 14px;cursor:pointer}
-  button:hover{background:var(--as-accent-2);color:#fff}
-  #score{color:var(--as-accent);font-weight:600}
+  body{margin:0;background:var(--as-bg,#030303);color:var(--as-text,#e6dcc8);font-family:system-ui,sans-serif;min-height:100vh}
+  .wrap{max-width:640px;margin:24px auto;padding:16px}
+  h1{color:var(--as-accent,#c9a227);margin:0 0 4px;text-align:center}
+  .sub{color:var(--as-muted);font-size:.85rem;text-align:center;margin-bottom:16px}
+  .game{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;align-items:flex-start}
+  canvas#c{background:#0a0a0a;border:2px solid var(--as-border);border-radius:10px}
+  .side{min-width:140px}
+  .side .box{background:var(--as-panel,#0a0a0a);border:1px solid var(--as-border);border-radius:10px;padding:12px;margin-bottom:10px}
+  .side h3{margin:0 0 8px;font-size:.85rem;color:var(--as-muted)}
+  #next{display:block;margin:0 auto;background:#0a0a0a;border-radius:6px}
+  .stat{font-size:1.2rem;color:var(--as-accent);font-weight:700}
+  .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+  button,.link{
+    background:var(--as-panel);color:var(--as-accent);border:1px solid var(--as-border);
+    border-radius:8px;padding:10px 16px;cursor:pointer;font-size:.95rem;text-decoration:none
+  }
+  button:hover,.link:hover{background:var(--as-accent-2);color:#fff}
+  kbd{background:var(--as-panel);border:1px solid var(--as-border);border-radius:4px;padding:1px 5px;font-size:.75rem}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Tetris</h1>
-  <div class="sub">Theme-aware · Arrow keys move · Up rotate · Space hard drop</div>
-  <canvas id="c" width="240" height="480"></canvas>
-  <div class="row"><span>Score: <span id="score">0</span></span><span>Lines: <span id="lines">0</span></span></div>
+  <h1>🧱 Tetris</h1>
+  <div class="sub">← → move · ↑ rotate · ↓ soft drop · Space hard drop · P pause</div>
+  <div class="game">
+    <canvas id="c" width="240" height="480"></canvas>
+    <div class="side">
+      <div class="box"><h3>Next</h3><canvas id="next" width="90" height="90"></canvas></div>
+      <div class="box"><h3>Score</h3><div class="stat" id="score">0</div></div>
+      <div class="box"><h3>Lines</h3><div class="stat" id="lines">0</div></div>
+      <div class="box"><h3>Level</h3><div class="stat" id="level">1</div></div>
+      <div class="box"><h3>Status</h3><div id="status">Ready</div></div>
+    </div>
+  </div>
   <div class="row">
-    <button id="start">Start / Restart</button>
-    <button id="pause">Pause</button>
-    <a href="/" style="color:var(--as-accent)">← Menu</a>
+    <button type="button" id="start">Start / Restart</button>
+    <button type="button" id="pause">Pause</button>
+    <a class="link" href="/">← Main Menu</a>
   </div>
 </div>
-<script src="/shared/theme-nav.js"></script>
 <script src="/shared/global-player.js"></script>
-<script src="tetris.js"></script>
+<script src="/tetris/tetris.js"></script>
 </body>
 </html>
