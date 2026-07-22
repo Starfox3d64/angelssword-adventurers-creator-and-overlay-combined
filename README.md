@@ -4,7 +4,7 @@
 
 **Made by TheDonOfEverything aka Paul Conforti**  
 Original JavaScript by **Leaflit** · Angular v0.3.0 by **OOzeClues**  
-Python Combined Edition · **v2.2** · 2026
+Python Combined Edition · **v2.3** · 2026
 
 > Runs 100% on your PC. No Node.js required.
 
@@ -19,6 +19,7 @@ Python Combined Edition · **v2.2** · 2026
 | **🎨 Creator** | /creator | Sprite Prep → AI Video → Video Prep → Transparent Export |
 | **🎭 Model & Rigging** | /live2d | Live2D runtime viewer + Creator media (PNG/WebM/GIF) |
 | **🎵 Music & Audio** | /music | Suno generation, library, trim/fade, **global BGM** |
+| **🌸 AnimeGen T2V** | /animegen | AideaLab anime video (Wan 2.2) via ComfyUI or local Diffusers |
 
 ---
 
@@ -112,6 +113,18 @@ Library folder: `music_public/library/`
 Models: `overlay_public/assets/models/YourCharacter/`
 
 ---
+
+
+
+## AnimeGen T2V (AideaLab)
+
+Local anime video generation based on **Wan 2.2**, trained with ethically sourced studio data ([Hugging Face](https://huggingface.co/aidealab/AnimeGen-T2V)).
+
+- **ComfyUI (recommended):** run your Wan/AnimeGen graph; put finished MP4s in `animegen_public/outputs/`
+- **Diffusers (CUDA):** place `high_noise.safetensors` + `low_noise.safetensors` in `animegen_public/models/`, install torch/diffusers, use the AnimeGen tab
+- Prompting tip: Japanese prompts + Wan-style negatives work best; English is OK with “Japanese anime style,” prefix
+- Presets for idle / wave / talk / walk loops aimed at Adventurer pipeline
+- **Send to Creator** hands the MP4 URL into Video Prep via localStorage
 
 ## ComfyUI
 
