@@ -5,7 +5,7 @@ Python port made by TheDonOfEverything aka Paul Conforti
 
 Credits:
 - Original JavaScript version by Leaflit
-- Angular improvements (v0.3.0) by OOzeClues
+- Angular Edition by OOzeClues (v0.3.0 → v0.4.0 feature parity)
 - Python Combined Edition by TheDonOfEverything aka Paul Conforti
 
 One unified program containing:
@@ -46,8 +46,8 @@ LIVE2D_MODELS = LIVE2D_PUBLIC / "models"
 BIN_DIR = CREATOR_PUBLIC / "bin"
 
 # ── Startup Checks ─────────────────────────────────────────────────────────
-VERSION = "2.4 - Don's Adventurer"
-LAST_UPDATED = "July 20, 2026"
+VERSION = "2.5.1 - Don's Adventurer (Angular 0.4.0 parity)"
+LAST_UPDATED = "2026-07-22"
 
 
 def get_ffmpeg_path():
@@ -2397,7 +2397,7 @@ def landing():
 
             <div class="credit">
                 Made by <strong>TheDonOfEverything</strong> aka <strong>Paul Conforti</strong><br>
-                Original by <strong>Leaflit</strong> • Angular improvements by <strong>OOzeClues</strong><br>
+                Original by <strong>Leaflit</strong> • Angular <strong>0.4.0</strong> by <strong>OOzeClues</strong> • Python by <strong>TheDonOfEverything</strong><br>
                 Angel's Sword Studios • 2026
             </div>
             <div class="footer">
@@ -2473,7 +2473,7 @@ def health():
         "version": VERSION,
         "made_by": "TheDonOfEverything aka Paul Conforti",
         "original": "Leaflit",
-        "angular_improvements": "OOzeClues",
+        "angular_improvements": "OOzeClues (0.3.0 → 0.4.0 parity)",
         "services": {
             "ffmpeg": {"available": bool(ffmpeg), "path": ffmpeg},
             "comfyui": {"available": comfy_ok, "url": "http://127.0.0.1:8188"},
@@ -2501,7 +2501,7 @@ if __name__ == "__main__":
     print("  ⚔️  AS ADVENTURER — COMBINED EDITION")
     print("  Made by TheDonOfEverything aka Paul Conforti")
     print("  Original JavaScript version by Leaflit")
-    print("  Angular improvements by OOzeClues (v0.3.0)")
+    print("  Angular Edition by OOzeClues (v0.3.0 → v0.4.0 feature parity)")
     print(f"  Version: {VERSION}  |  Last Updated: {LAST_UPDATED}")
     print("═" * 72)
 
