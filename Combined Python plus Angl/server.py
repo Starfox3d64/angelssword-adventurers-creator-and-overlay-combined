@@ -71,6 +71,14 @@ def get_ffmpeg_path():
     return None
 
 
+def _ffmpeg_version_line(path):
+    try:
+        out = subprocess.run([str(path), "-version"], capture_output=True, text=True, timeout=8)
+        return (out.stdout or "").split("\n")[0].strip()
+    except Exception:
+        return ""
+
+
 def ensure_ffmpeg():
     """
     Make sure ffmpeg is available.
@@ -86,6 +94,10 @@ def ensure_ffmpeg():
 
     existing = get_ffmpeg_path()
     if existing:
+        ver = _ffmpeg_version_line(existing)
+        if ver:
+            print(f"[ffmpeg] Using {existing}")
+            print(f"[ffmpeg] {ver}")
         return existing
 
     print("[ffmpeg] Not found. Attempting to download a small static build...")
@@ -745,6 +757,106 @@ def api_xai_fetch_url():
         return jsonify({"error": str(e)}), 502
 
 
+
+
+# ── Music: export track at altered playback speed (atempo) ───────────
+@app.route("/api/music/export-speed", methods=["POST"])
+def api_music_export_speed():
+    """Re-encode audio at a new speed using ffmpeg atempo (0.5–2.0 per stage).
+    JSON: { "path": "relative under music library or /music/...", "rate": 1.25, "title": "optional" }
+    OR multipart: file + rate field.
+    Returns audio/mpeg or audio/wav attachment.
+    """
+    ff = _resolve_ffmpeg()
+    if not ff:
+        return jsonify({"error": "ffmpeg not found — cannot export speed-adjusted audio on server"}), 503
+
+    rate = 1.0
+    src_path = None
+    title = "track"
+    tmp_upload = None
+
+    if request.content_type and "multipart/form-data" in request.content_type:
+        f = request.files.get("file")
+        rate = float(request.form.get("rate") or 1)
+        title = Path(f.filename or "track").stem if f else "track"
+        if not f:
+            return jsonify({"error": "file required"}), 400
+        tmp_upload = Path(tempfile.mkdtemp(prefix="as-music-")) / (f.filename or "in.mp3")
+        f.save(str(tmp_upload))
+        src_path = tmp_upload
+    else:
+        data = request.get_json(silent=True) or {}
+        rate = float(data.get("rate") or 1)
+        title = str(data.get("title") or "track")
+        rel = str(data.get("path") or data.get("url") or "").lstrip("/")
+        # Accept /music/library/x or library/x
+        if rel.startswith("music/"):
+            rel = rel[len("music/"):]
+        candidate = MUSIC_PUBLIC / rel
+        if not candidate.exists():
+            candidate = MUSIC_LIBRARY / Path(rel).name
+        if not candidate.exists() or not candidate.is_file():
+            return jsonify({"error": f"Source not found: {rel}"}), 404
+        src_path = candidate
+
+    rate = max(0.5, min(2.0, rate))
+    if abs(rate - 1.0) < 0.001:
+        return jsonify({"error": "Rate is 1.0 — nothing to change. Adjust speed first."}), 400
+
+    # Chain atempo filters (each must be 0.5–2.0)
+    filters = []
+    remaining = rate
+    while remaining > 2.0 + 1e-6:
+        filters.append("atempo=2.0")
+        remaining /= 2.0
+    while remaining < 0.5 - 1e-6:
+        filters.append("atempo=0.5")
+        remaining /= 0.5
+    filters.append(f"atempo={remaining:.6f}")
+    af = ",".join(filters)
+
+    out_dir = Path(tempfile.mkdtemp(prefix="as-music-out-"))
+    safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in title)[:80] or "track"
+    out_name = f"{safe}_{rate:.2f}x.mp3"
+    out_path = out_dir / out_name
+
+    args = [
+        ff, "-y", "-hide_banner", "-loglevel", "error",
+        "-i", str(src_path),
+        "-filter:a", af,
+        "-vn",
+        "-c:a", "libmp3lame",
+        "-q:a", "2",
+        str(out_path),
+    ]
+    try:
+        subprocess.run(args, check=True, timeout=300)
+        if not out_path.exists() or out_path.stat().st_size == 0:
+            raise RuntimeError("ffmpeg produced empty output")
+        data = out_path.read_bytes()
+        return Response(
+            data,
+            mimetype="audio/mpeg",
+            headers={
+                "Content-Disposition": f'attachment; filename="{out_name}"',
+                "Content-Length": str(len(data)),
+            },
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        try:
+            if tmp_upload and tmp_upload.parent.exists():
+                shutil.rmtree(tmp_upload.parent, ignore_errors=True)
+        except Exception:
+            pass
+        try:
+            shutil.rmtree(out_dir, ignore_errors=True)
+        except Exception:
+            pass
+
+
 # ── Transparent WebM Export (ffmpeg session API) ──────────────────────────
 # Client sends chroma-keyed PNG frames; server packs them into VP9 WebM with alpha.
 
@@ -779,16 +891,34 @@ def api_export_status():
 
 @app.route("/api/export/session", methods=["POST"])
 def api_export_session_create():
+    """Create export session. Body optional JSON: { format: 'png'|'rgba', width, height }.
+    RGBA mode (Angular 0.4.0 GPU path) streams raw pixels — no PNG double-compression.
+    """
     ff = _resolve_ffmpeg()
     if not ff:
         return jsonify({
-            "error": "ffmpeg not found. Place ffmpeg.exe in creator_public/bin/ or install system ffmpeg."
+            "error": "ffmpeg not found. Place ffmpeg in bin/ or install system ffmpeg (auto-download attempted on Windows at startup)."
         }), 503
+    data = request.get_json(silent=True) or {}
+    fmt = "rgba" if str(data.get("format") or "").lower() == "rgba" else "png"
+    width = int(data.get("width") or 0)
+    height = int(data.get("height") or 0)
+    if fmt == "rgba" and (width < 1 or height < 1 or width > 8192 or height > 8192):
+        return jsonify({"error": "RGBA sessions require valid width/height (1–8192)"}), 400
     session_id = uuid.uuid4().hex
     tmp = Path(tempfile.mkdtemp(prefix="as-export-"))
-    _export_sessions[session_id] = {"dir": tmp, "frames": 0, "created": time.time()}
-    print(f"[EXPORT] Session {session_id} → {tmp}")
-    return jsonify({"sessionId": session_id, "maxFrames": FFMPEG_MAX_FRAMES})
+    _export_sessions[session_id] = {
+        "dir": tmp, "frames": 0, "created": time.time(),
+        "format": fmt, "width": width, "height": height,
+    }
+    print(f"[EXPORT] Session {session_id} → {tmp} ({fmt}" + (f" {width}x{height}" if fmt == "rgba" else "") + ")")
+    return jsonify({
+        "sessionId": session_id,
+        "maxFrames": FFMPEG_MAX_FRAMES,
+        "format": fmt,
+        "width": width if fmt == "rgba" else None,
+        "height": height if fmt == "rgba" else None,
+    })
 
 
 @app.route("/api/export/session/<session_id>/frame", methods=["POST"])
@@ -804,13 +934,25 @@ def api_export_session_frame(session_id):
         return jsonify({"error": "Invalid frame index"}), 400
 
     body = request.get_data()
-    if not body or len(body) < 8 or body[0] != 0x89 or body[1] != 0x50:
-        return jsonify({"error": "Body is not a PNG image"}), 400
+    if not body:
+        return jsonify({"error": "Empty frame body"}), 400
 
-    name = f"frame_{index:05d}.png"
+    fmt = session.get("format") or "png"
+    if fmt == "rgba":
+        expected = int(session.get("width") or 0) * int(session.get("height") or 0) * 4
+        if expected and len(body) != expected:
+            return jsonify({
+                "error": f"RGBA frame size mismatch: got {len(body)}, expected {expected}"
+            }), 400
+        name = f"frame_{index:05d}.rgba"
+    else:
+        if len(body) < 8 or body[0] != 0x89 or body[1] != 0x50:
+            return jsonify({"error": "Body is not a PNG image"}), 400
+        name = f"frame_{index:05d}.png"
+
     (session["dir"] / name).write_bytes(body)
     session["frames"] = max(session["frames"], index + 1)
-    return jsonify({"ok": True, "index": index, "bytes": len(body)})
+    return jsonify({"ok": True, "index": index, "bytes": len(body), "format": fmt})
 
 
 @app.route("/api/export/session/<session_id>/finalize", methods=["POST"])
@@ -834,31 +976,71 @@ def api_export_session_finalize(session_id):
     export_dir = session["dir"]
     out_path = export_dir / "out.webm"
 
+    fmt = session.get("format") or "png"
+    width = int(session.get("width") or 0)
+    height = int(session.get("height") or 0)
+
     # Verify frames exist
     for i in range(frame_count):
-        if not (export_dir / f"frame_{i:05d}.png").exists():
+        name = f"frame_{i:05d}.rgba" if fmt == "rgba" else f"frame_{i:05d}.png"
+        if not (export_dir / name).exists():
             shutil.rmtree(export_dir, ignore_errors=True)
             return jsonify({"error": f"Missing frame {i}"}), 400
 
-    args = [
-        ff, "-y", "-hide_banner", "-loglevel", "error",
-        "-framerate", str(fps),
-        "-start_number", "0",
-        "-i", str(export_dir / "frame_%05d.png"),
-        "-frames:v", str(frame_count),
-        "-c:v", "libvpx-vp9",
-        "-pix_fmt", "yuva420p",
-        "-auto-alt-ref", "0",
-        "-b:v", "0",
-        "-crf", "28",
-        "-deadline", "good",
-        "-cpu-used", "2",
-        "-an",
-        str(out_path),
-    ]
     try:
-        print(f"[EXPORT] Finalize {session_id}: {frame_count} frames @ {fps}fps")
-        subprocess.run(args, check=True, timeout=600)
+        print(f"[EXPORT] Finalize {session_id}: {frame_count} frames @ {fps}fps ({fmt})")
+        if fmt == "rgba":
+            # Stream concatenated raw RGBA into ffmpeg stdin (no PNG intermediate)
+            expected = width * height * 4
+            args = [
+                ff, "-y", "-hide_banner", "-loglevel", "error",
+                "-f", "rawvideo",
+                "-pixel_format", "rgba",
+                "-video_size", f"{width}x{height}",
+                "-framerate", str(fps),
+                "-i", "pipe:0",
+                "-frames:v", str(frame_count),
+                "-c:v", "libvpx-vp9",
+                "-pix_fmt", "yuva420p",
+                "-auto-alt-ref", "0",
+                "-b:v", "0",
+                "-crf", "28",
+                "-deadline", "good",
+                "-cpu-used", "2",
+                "-an",
+                str(out_path),
+            ]
+            proc = subprocess.Popen(args, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+            assert proc.stdin is not None
+            for i in range(frame_count):
+                buf = (export_dir / f"frame_{i:05d}.rgba").read_bytes()
+                if len(buf) != expected:
+                    proc.kill()
+                    raise RuntimeError(f"RGBA frame {i} size {len(buf)} != {expected}")
+                proc.stdin.write(buf)
+            proc.stdin.close()
+            stderr = proc.stderr.read() if proc.stderr else b""
+            code = proc.wait(timeout=600)
+            if code != 0:
+                raise RuntimeError(f"ffmpeg exited {code}: {stderr[-1500:].decode('utf-8', 'replace')}")
+        else:
+            args = [
+                ff, "-y", "-hide_banner", "-loglevel", "error",
+                "-framerate", str(fps),
+                "-start_number", "0",
+                "-i", str(export_dir / "frame_%05d.png"),
+                "-frames:v", str(frame_count),
+                "-c:v", "libvpx-vp9",
+                "-pix_fmt", "yuva420p",
+                "-auto-alt-ref", "0",
+                "-b:v", "0",
+                "-crf", "28",
+                "-deadline", "good",
+                "-cpu-used", "2",
+                "-an",
+                str(out_path),
+            ]
+            subprocess.run(args, check=True, timeout=600)
         if not out_path.exists() or out_path.stat().st_size == 0:
             raise RuntimeError("ffmpeg produced empty output")
 
@@ -1183,6 +1365,7 @@ def _start_ws_server():
 
 # ── Live2D Model & Rigging Suite ──────────────────────────────────────
 @app.route("/live2d")
+@app.route("/live2d/")
 def live2d_index():
     return send_from_directory(LIVE2D_PUBLIC, "index.html")
 
@@ -1700,6 +1883,7 @@ def tetris_files(filename):
     return send_from_directory(APP_DIR / "tetris_public", filename)
 
 @app.route("/animegen")
+@app.route("/animegen/")
 def animegen_index():
     return send_from_directory(ANIMEGEN_PUBLIC, "index.html")
 
