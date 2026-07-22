@@ -46,7 +46,7 @@ LIVE2D_MODELS = LIVE2D_PUBLIC / "models"
 BIN_DIR = CREATOR_PUBLIC / "bin"
 
 # ── Startup Checks ─────────────────────────────────────────────────────────
-VERSION = "2.3 - Don's Adventurer"
+VERSION = "2.4 - Don's Adventurer"
 LAST_UPDATED = "July 20, 2026"
 
 
@@ -1690,6 +1690,15 @@ def api_suno_feed():
 _animegen_jobs = {}
 
 
+
+@app.route("/tetris")
+def tetris_index():
+    return send_from_directory(APP_DIR / "tetris_public", "index.html")
+
+@app.route("/tetris/<path:filename>")
+def tetris_files(filename):
+    return send_from_directory(APP_DIR / "tetris_public", filename)
+
 @app.route("/animegen")
 def animegen_index():
     return send_from_directory(ANIMEGEN_PUBLIC, "index.html")
@@ -2008,6 +2017,31 @@ def landing():
                     radial-gradient(ellipse at 20% 90%, rgba(226, 61, 79, 0.15) 0%, transparent 40%),
                     linear-gradient(165deg, #0a1020 0%, #121c34 50%, #0d1528 100%);
             }
+            [data-theme="ooz"] {
+                --bg-deep: #07141c;
+                --bg-panel: rgba(12, 30, 40, 0.94);
+                --accent: #2ad4e8;
+                --accent-2: #ff2d7a;
+                --accent-glow: rgba(42, 212, 232, 0.4);
+                --text: #e8fbff;
+                --text-muted: #7ab0bc;
+                --card-border: rgba(42, 212, 232, 0.35);
+                --bg-image:
+                    radial-gradient(ellipse at 70% 20%, rgba(42,212,232,0.2) 0%, transparent 45%),
+                    radial-gradient(ellipse at 20% 80%, rgba(255,45,122,0.15) 0%, transparent 40%),
+                    #07141c;
+            }
+            [data-theme="original"] {
+                --bg-deep: #0f1419;
+                --bg-panel: rgba(26, 35, 50, 0.95);
+                --accent: #4ecdc4;
+                --accent-2: #ff6b6b;
+                --accent-glow: rgba(78, 205, 196, 0.35);
+                --text: #e8eef5;
+                --text-muted: #8899aa;
+                --card-border: rgba(78, 205, 196, 0.3);
+                --bg-image: radial-gradient(ellipse at 50% 0%, rgba(78,205,196,0.12) 0%, transparent 50%), #0f1419;
+            }
             body {
                 background: var(--bg-image);
                 color: var(--text);
@@ -2114,17 +2148,6 @@ def landing():
             .credit { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px; line-height: 1.6; }
             .footer { color: var(--text-muted); font-size: 0.8rem; }
             .footer a { color: var(--accent); }
-            .path-note {
-                margin: 0 auto 28px;
-                max-width: 640px;
-                font-size: 0.82rem;
-                color: var(--text-muted);
-                border: 1px dashed var(--card-border);
-                border-radius: 10px;
-                padding: 10px 14px;
-                text-align: left;
-            }
-            .path-note strong { color: var(--accent); }
         </style>
     </head>
     <body data-theme="don">
@@ -2132,8 +2155,10 @@ def landing():
             <div class="corner-box">
                 <div class="corner-title">Theme</div>
                 <div class="theme-row">
-                    <button type="button" class="theme-btn active" data-theme-set="don" id="themeDon">Don (Gold)</button>
-                    <button type="button" class="theme-btn" data-theme-set="leaflit" id="themeLeaflit">Leaflit (AIMancer)</button>
+                    <button type="button" class="theme-btn active" data-theme-set="don">Don (Gold)</button>
+                    <button type="button" class="theme-btn" data-theme-set="leaflit">Leaflit</button>
+                    <button type="button" class="theme-btn" data-theme-set="ooz">Ooz</button>
+                    <button type="button" class="theme-btn" data-theme-set="original">Original</button>
                 </div>
             </div>
             <div class="corner-box">
@@ -2151,10 +2176,6 @@ def landing():
             <div class="subtitle">Angel's Sword Studios · Combined Python Edition</div>
             <div class="tagline">Overlay · Creator · Live2D · Music · AnimeGen</div>
 
-            <div class="path-note">
-                <strong>Video Prep</strong> lives in the <strong>Creator</strong> app (<code>/creator</code> → Video Prep tab), not in AnimeGen.<br>
-                AnimeGen writes MP4s to <code>animegen_public/outputs/</code>, then you can hand off into Creator Video Prep.
-            </div>
 
             <div class="cards">
                 <a href="/overlay" class="card">
@@ -2197,13 +2218,17 @@ def landing():
                 <a href="/api/ffmpeg/status">ffmpeg</a>
             </div>
         </div>
+        <script src="/shared/theme-nav.js"></script>
         <script src="/shared/global-player.js"></script>
         <script>
           (function () {
-            const root = document.body;
             function apply(theme) {
-              root.setAttribute('data-theme', theme);
-              localStorage.setItem('as_menu_theme', theme);
+              if (window.__ASTheme) window.__ASTheme.set(theme);
+              else {
+                document.documentElement.setAttribute('data-theme', theme);
+                document.body.setAttribute('data-theme', theme);
+                localStorage.setItem('as_menu_theme', theme);
+              }
               document.querySelectorAll('[data-theme-set]').forEach(btn => {
                 btn.classList.toggle('active', btn.getAttribute('data-theme-set') === theme);
               });
