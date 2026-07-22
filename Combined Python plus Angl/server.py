@@ -37,13 +37,16 @@ OVERLAY_PUBLIC = APP_DIR / "overlay_public"
 CREATOR_PUBLIC = APP_DIR / "creator_public"
 LIVE2D_PUBLIC = APP_DIR / "live2d_public"
 MUSIC_PUBLIC = APP_DIR / "music_public"
+ANIMEGEN_PUBLIC = APP_DIR / "animegen_public"
+ANIMEGEN_MODELS = ANIMEGEN_PUBLIC / "models"
+ANIMEGEN_OUTPUTS = ANIMEGEN_PUBLIC / "outputs"
 MUSIC_LIBRARY = MUSIC_PUBLIC / "library"
 SHARED_PUBLIC = APP_DIR / "shared"
 LIVE2D_MODELS = LIVE2D_PUBLIC / "models"
 BIN_DIR = CREATOR_PUBLIC / "bin"
 
 # ── Startup Checks ─────────────────────────────────────────────────────────
-VERSION = "2.2 - Don's Adventurer"
+VERSION = "2.3 - Don's Adventurer"
 LAST_UPDATED = "July 20, 2026"
 
 
@@ -1682,6 +1685,293 @@ def api_suno_feed():
     return jsonify({"error": str(last_err or "feed failed")}), 502
 
 
+
+# ── AnimeGen T2V (AideaLab / Wan 2.2) ─────────────────────────────────
+_animegen_jobs = {}
+
+
+@app.route("/animegen")
+def animegen_index():
+    return send_from_directory(ANIMEGEN_PUBLIC, "index.html")
+
+
+@app.route("/animegen/<path:filename>")
+def animegen_files(filename):
+    return send_from_directory(ANIMEGEN_PUBLIC, filename)
+
+
+@app.route("/api/animegen/status", methods=["GET"])
+def api_animegen_status():
+    ANIMEGEN_MODELS.mkdir(parents=True, exist_ok=True)
+    ANIMEGEN_OUTPUTS.mkdir(parents=True, exist_ok=True)
+    high = (ANIMEGEN_MODELS / "high_noise.safetensors").exists()
+    low = (ANIMEGEN_MODELS / "low_noise.safetensors").exists()
+    diffusers_ok = False
+    cuda = False
+    try:
+        import torch  # noqa: F401
+        import diffusers  # noqa: F401
+        diffusers_ok = True
+        import torch as _t
+        cuda = bool(_t.cuda.is_available())
+    except Exception:
+        pass
+    comfy = {"available": False}
+    try:
+        r = http_requests.get("http://127.0.0.1:8188/system_stats", timeout=1.5)
+        comfy = {"available": r.ok}
+    except Exception:
+        pass
+    return jsonify({
+        "diffusers_available": diffusers_ok,
+        "cuda": cuda,
+        "weights_ready": high and low,
+        "high_noise": high,
+        "low_noise": low,
+        "comfyui": comfy,
+        "model_card": "https://huggingface.co/aidealab/AnimeGen-T2V",
+        "note": "AnimeGen-T2V (AideaLab). Prefer Japanese prompts. ComfyUI Wan workflow recommended for most users.",
+    })
+
+
+@app.route("/api/animegen/outputs", methods=["GET"])
+def api_animegen_outputs():
+    ANIMEGEN_OUTPUTS.mkdir(parents=True, exist_ok=True)
+    items = []
+    for f in sorted(ANIMEGEN_OUTPUTS.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+        if f.suffix.lower() in {".mp4", ".webm", ".gif"}:
+            items.append({
+                "name": f.name,
+                "url": f"/animegen/outputs/{f.name}",
+                "size": f.stat().st_size,
+            })
+    return jsonify({"outputs": items[:50]})
+
+
+@app.route("/api/animegen/generate", methods=["POST"])
+def api_animegen_generate():
+    data = request.get_json(silent=True) or {}
+    backend = (data.get("backend") or "comfyui").lower()
+    prompt = (data.get("prompt") or "").strip()
+    if not prompt:
+        return jsonify({"error": "prompt required"}), 400
+    job_id = str(uuid.uuid4())[:12]
+    job = {
+        "id": job_id,
+        "status": "queued",
+        "progress": 0.05,
+        "message": "queued",
+        "url": None,
+        "backend": backend,
+        "params": data,
+    }
+    _animegen_jobs[job_id] = job
+
+    def run_job():
+        try:
+            job["status"] = "running"
+            job["message"] = "starting"
+            job["progress"] = 0.1
+            if backend == "diffusers":
+                _run_animegen_diffusers(job)
+            else:
+                _run_animegen_comfy(job)
+        except Exception as e:
+            job["status"] = "error"
+            job["message"] = str(e)
+            job["progress"] = 0
+
+    threading.Thread(target=run_job, daemon=True).start()
+    return jsonify({
+        "job_id": job_id,
+        "message": "Job started. Poll /api/animegen/job/<id>. Diffusers needs CUDA + weights; ComfyUI needs Wan/AnimeGen graph.",
+    })
+
+
+@app.route("/api/animegen/job/<job_id>", methods=["GET"])
+def api_animegen_job(job_id):
+    job = _animegen_jobs.get(job_id)
+    if not job:
+        return jsonify({"error": "unknown job"}), 404
+    return jsonify(job)
+
+
+@app.route("/api/animegen/cancel/<job_id>", methods=["POST"])
+def api_animegen_cancel(job_id):
+    job = _animegen_jobs.get(job_id)
+    if not job:
+        return jsonify({"error": "unknown job"}), 404
+    if job["status"] in ("done", "error"):
+        return jsonify(job)
+    job["status"] = "cancelled"
+    job["message"] = "cancelled"
+    return jsonify(job)
+
+
+def _run_animegen_comfy(job):
+    """Submit a minimal API prompt to ComfyUI. Users should load a Wan/AnimeGen workflow;
+    we try a text-encoded queue and save output path when possible."""
+    params = job.get("params") or {}
+    base = (params.get("comfy_url") or "http://127.0.0.1:8188").rstrip("/")
+    job["message"] = "checking ComfyUI"
+    try:
+        r = http_requests.get(f"{base}/system_stats", timeout=3)
+        if not r.ok:
+            raise RuntimeError("ComfyUI not reachable at " + base)
+    except Exception as e:
+        raise RuntimeError(
+            f"ComfyUI offline ({e}). Start ComfyUI with Wan 2.2 + AnimeGen high/low noise weights, "
+            "or switch backend to Diffusers if you have CUDA and model files."
+        ) from e
+
+    job["progress"] = 0.2
+    job["message"] = (
+        "ComfyUI is online. Open your Wan/AnimeGen workflow in ComfyUI, set the prompt to the text below, and Queue Prompt. "
+        "This suite cannot inject a full A14B graph automatically without your node setup."
+    )
+    # Store prompt helper file for the user
+    ANIMEGEN_OUTPUTS.mkdir(parents=True, exist_ok=True)
+    tip = ANIMEGEN_OUTPUTS / f"prompt_{job['id']}.txt"
+    tip.write_text(
+        f"PROMPT:\n{params.get('prompt','')}\n\nNEGATIVE:\n{params.get('negative_prompt','')}\n\n"
+        f"size={params.get('width')}x{params.get('height')} secs={params.get('seconds')} "
+        f"seed={params.get('seed')} steps={params.get('steps')} cfg={params.get('guidance_scale')}\n",
+        encoding="utf-8",
+    )
+    # Try to detect new mp4 in Comfy output or our outputs folder for a short window
+    job["progress"] = 0.35
+    job["message"] = "Waiting for you to queue in ComfyUI… (watching animegen_public/outputs for new mp4)"
+    deadline = time.time() + 600
+    seen = {f.name for f in ANIMEGEN_OUTPUTS.glob("*.mp4")}
+    while time.time() < deadline:
+        if job["status"] == "cancelled":
+            return
+        time.sleep(3)
+        job["progress"] = min(0.9, job["progress"] + 0.02)
+        for f in ANIMEGEN_OUTPUTS.glob("*.mp4"):
+            if f.name not in seen:
+                job["status"] = "done"
+                job["progress"] = 1
+                job["url"] = f"/animegen/outputs/{f.name}"
+                job["message"] = "found " + f.name
+                return
+    job["status"] = "error"
+    job["message"] = (
+        "Timed out waiting for output. Export your ComfyUI video into animegen_public/outputs/ "
+        "or use Diffusers backend with high_noise.safetensors + low_noise.safetensors in animegen_public/models/."
+    )
+
+
+def _run_animegen_diffusers(job):
+    params = job.get("params") or {}
+    ANIMEGEN_MODELS.mkdir(parents=True, exist_ok=True)
+    ANIMEGEN_OUTPUTS.mkdir(parents=True, exist_ok=True)
+    high = ANIMEGEN_MODELS / "high_noise.safetensors"
+    low = ANIMEGEN_MODELS / "low_noise.safetensors"
+    if not high.exists() or not low.exists():
+        raise RuntimeError(
+            "Missing high_noise.safetensors / low_noise.safetensors in animegen_public/models/. "
+            "Download from https://huggingface.co/aidealab/AnimeGen-T2V"
+        )
+    try:
+        import torch
+        from diffusers import (
+            WanPipeline,
+            WanTransformer3DModel,
+            FlowMatchEulerDiscreteScheduler,
+            AutoencoderKLWan,
+        )
+        from diffusers.utils import export_to_video
+    except Exception as e:
+        raise RuntimeError(
+            "Diffusers stack not installed. pip install torch torchvision diffusers transformers "
+            f"accelerate peft imageio imageio-ffmpeg safetensors — detail: {e}"
+        ) from e
+
+    if not torch.cuda.is_available():
+        job["message"] = "Warning: no CUDA — will be very slow or fail"
+    job["progress"] = 0.15
+    job["message"] = "loading Wan / AnimeGen weights (first run is slow)"
+
+    width = int(params.get("width") or 832)
+    height = int(params.get("height") or 480)
+    secs = int(params.get("seconds") or 5)
+    steps = int(params.get("steps") or 8)
+    seed = int(params.get("seed") or 42)
+    cfg = float(params.get("guidance_scale") or 1.0)
+    prompt = params.get("prompt") or ""
+    neg = params.get("negative_prompt") or "3d, cg, photo, stop, wait"
+
+    scheduler = FlowMatchEulerDiscreteScheduler(shift=3.0)
+    transformer_high = WanTransformer3DModel.from_single_file(str(high), torch_dtype=torch.bfloat16)
+    transformer_low = WanTransformer3DModel.from_single_file(str(low), torch_dtype=torch.bfloat16)
+    job["progress"] = 0.35
+    job["message"] = "loading VAE + pipeline"
+    vae = AutoencoderKLWan.from_pretrained(
+        "Wan-AI/Wan2.2-T2V-A14B-Diffusers", subfolder="vae", torch_dtype=torch.float32
+    )
+    pipe = WanPipeline.from_pretrained(
+        "Wan-AI/Wan2.2-T2V-A14B-Diffusers",
+        transformer=transformer_high,
+        transformer_2=transformer_low,
+        scheduler=scheduler,
+        vae=vae,
+        torch_dtype=torch.bfloat16,
+    )
+    try:
+        pipe.load_lora_weights(
+            "lightx2v/Wan2.2-Lightning",
+            weight_name="Wan2.2-T2V-A14B-4steps-lora-250928/high_noise_model.safetensors",
+            adapter_name="high",
+        )
+        pipe.load_lora_weights(
+            "lightx2v/Wan2.2-Lightning",
+            weight_name="Wan2.2-T2V-A14B-4steps-lora-250928/low_noise_model.safetensors",
+            adapter_name="low",
+            load_into_transformer_2=True,
+        )
+        pipe.set_adapters(["high", "low"], adapter_weights=[2.0, 1.0])
+    except Exception as e:
+        job["message"] = f"LoRA optional skip: {e}"
+    try:
+        transformer_high.enable_layerwise_casting(
+            storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16
+        )
+        transformer_low.enable_layerwise_casting(
+            storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16
+        )
+    except Exception:
+        pass
+    try:
+        pipe.enable_model_cpu_offload()
+    except Exception:
+        pass
+
+    job["progress"] = 0.5
+    job["message"] = "generating frames"
+    if job["status"] == "cancelled":
+        return
+    generator = torch.Generator("cuda" if torch.cuda.is_available() else "cpu").manual_seed(seed)
+    output = pipe(
+        prompt=prompt,
+        negative_prompt=neg,
+        height=height,
+        width=width,
+        num_frames=int(16 * secs + 1),
+        guidance_scale=cfg,
+        num_inference_steps=steps,
+        generator=generator,
+    ).frames[0]
+    job["progress"] = 0.9
+    job["message"] = "exporting mp4"
+    out_path = ANIMEGEN_OUTPUTS / f"animegen_{job['id']}.mp4"
+    export_to_video(output, str(out_path), fps=16)
+    job["status"] = "done"
+    job["progress"] = 1
+    job["url"] = f"/animegen/outputs/{out_path.name}"
+    job["message"] = "done"
+
+
 @app.route("/")
 def landing():
     html = """
@@ -1692,17 +1982,34 @@ def landing():
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>⚔️ Don's Adventurer</title>
         <style>
-            :root {
+            :root, [data-theme="don"] {
                 --bg-deep: #030303;
                 --bg-panel: #0a0a0a;
-                --accent-gold: #c9a227;
-                --accent-gold-glow: rgba(201, 162, 39, 0.4);
+                --accent: #c9a227;
+                --accent-2: #8b2942;
+                --accent-glow: rgba(201, 162, 39, 0.4);
                 --text: #e6dcc8;
                 --text-muted: #9a8b6a;
+                --card-border: rgba(201, 162, 39, 0.28);
+                --bg-image: radial-gradient(ellipse at 50% 0%, rgba(107,28,35,0.18) 0%, transparent 50%), #030303;
             }
-            
+            /* Leaflit / AIMancer — blue mage, red cape, library night */
+            [data-theme="leaflit"] {
+                --bg-deep: #0a1020;
+                --bg-panel: rgba(18, 28, 52, 0.92);
+                --accent: #5b9fff;
+                --accent-2: #e23d4f;
+                --accent-glow: rgba(91, 159, 255, 0.45);
+                --text: #e8f0ff;
+                --text-muted: #9bb0d0;
+                --card-border: rgba(91, 159, 255, 0.35);
+                --bg-image:
+                    radial-gradient(ellipse at 80% 10%, rgba(70, 120, 255, 0.25) 0%, transparent 45%),
+                    radial-gradient(ellipse at 20% 90%, rgba(226, 61, 79, 0.15) 0%, transparent 40%),
+                    linear-gradient(165deg, #0a1020 0%, #121c34 50%, #0d1528 100%);
+            }
             body {
-                background: radial-gradient(ellipse at 50% 0%, rgba(107,28,35,0.15) 0%, transparent 50%), #030303;
+                background: var(--bg-image);
                 color: var(--text);
                 font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
                 margin: 0;
@@ -1711,168 +2018,209 @@ def landing():
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                transition: background 0.35s ease, color 0.25s ease;
             }
-            
+            .corner {
+                position: fixed;
+                top: 14px;
+                right: 14px;
+                z-index: 100;
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+                gap: 8px;
+                max-width: min(320px, 92vw);
+            }
+            .corner-box {
+                background: var(--bg-panel);
+                border: 1px solid var(--card-border);
+                border-radius: 12px;
+                padding: 10px 12px;
+                box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+                backdrop-filter: blur(10px);
+            }
+            .corner-title {
+                font-size: 0.7rem;
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+                color: var(--text-muted);
+                margin-bottom: 6px;
+            }
+            .theme-row { display: flex; gap: 6px; flex-wrap: wrap; }
+            .theme-btn {
+                border: 1px solid var(--card-border);
+                background: transparent;
+                color: var(--text);
+                border-radius: 999px;
+                padding: 5px 10px;
+                font-size: 0.78rem;
+                cursor: pointer;
+            }
+            .theme-btn.active {
+                background: var(--accent);
+                color: #0a0a0a;
+                border-color: transparent;
+                font-weight: 600;
+            }
+            .api-links { display: flex; flex-direction: column; gap: 4px; }
+            .api-links a {
+                color: var(--accent);
+                text-decoration: none;
+                font-size: 0.82rem;
+                padding: 4px 0;
+            }
+            .api-links a:hover { text-decoration: underline; color: var(--text); }
             .container {
-                max-width: 720px;
+                max-width: 960px;
                 width: 100%;
                 text-align: center;
             }
-            
             .logo {
-                font-size: 3.2rem;
+                font-size: 3rem;
                 font-weight: 700;
-                color: var(--accent-gold);
+                color: var(--accent);
                 margin-bottom: 8px;
-                text-shadow: 0 0 20px var(--accent-gold-glow);
+                text-shadow: 0 0 22px var(--accent-glow);
             }
-            
-            .subtitle {
-                font-size: 1.1rem;
-                color: var(--text-muted);
-                margin-bottom: 8px;
-            }
-            
-            .tagline {
-                font-size: 1.35rem;
-                color: var(--text);
-                margin-bottom: 40px;
-                font-weight: 500;
-            }
-            
+            .subtitle { font-size: 1.05rem; color: var(--text-muted); margin-bottom: 6px; }
+            .tagline { font-size: 1.2rem; margin-bottom: 36px; font-weight: 500; }
             .cards {
                 display: flex;
-                gap: 24px;
+                gap: 20px;
                 justify-content: center;
                 flex-wrap: wrap;
-                margin-bottom: 50px;
+                margin-bottom: 40px;
             }
-            
             .card {
                 background: var(--bg-panel);
-                border: 1px solid rgba(212, 175, 55, 0.25);
+                border: 1px solid var(--card-border);
                 border-radius: 12px;
-                padding: 32px 28px;
-                width: 300px;
+                padding: 28px 24px;
+                width: 260px;
                 text-decoration: none;
                 color: var(--text);
                 transition: all 0.2s ease;
                 box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                text-align: left;
             }
-            
             .card:hover {
-                transform: translateY(-6px);
-                border-color: var(--accent-gold);
-                box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+                transform: translateY(-4px);
+                box-shadow: 0 8px 28px rgba(0,0,0,0.45), 0 0 20px var(--accent-glow);
+                border-color: var(--accent);
             }
-            
-            .card-icon {
-                font-size: 2.8rem;
-                margin-bottom: 16px;
-                display: block;
-            }
-            
-            .card-title {
-                font-size: 1.5rem;
-                font-weight: 600;
-                margin-bottom: 12px;
-                color: var(--accent-gold);
-            }
-            
-            .card-desc {
-                font-size: 0.95rem;
+            .card-icon { font-size: 1.8rem; margin-bottom: 8px; }
+            .card-title { font-size: 1.15rem; font-weight: 600; color: var(--accent); margin-bottom: 8px; }
+            .card-desc { font-size: 0.88rem; color: var(--text-muted); line-height: 1.45; }
+            .credit { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px; line-height: 1.6; }
+            .footer { color: var(--text-muted); font-size: 0.8rem; }
+            .footer a { color: var(--accent); }
+            .path-note {
+                margin: 0 auto 28px;
+                max-width: 640px;
+                font-size: 0.82rem;
                 color: var(--text-muted);
-                line-height: 1.5;
+                border: 1px dashed var(--card-border);
+                border-radius: 10px;
+                padding: 10px 14px;
+                text-align: left;
             }
-            
-            .credit {
-                margin-top: 30px;
-                padding-top: 24px;
-                border-top: 1px solid rgba(255,255,255,0.1);
-                font-size: 0.95rem;
-                color: var(--text-muted);
-            }
-            
-            .credit strong {
-                color: var(--accent-gold);
-            }
-            
-            .footer {
-                margin-top: 20px;
-                font-size: 0.85rem;
-                color: #556677;
-            }
+            .path-note strong { color: var(--accent); }
         </style>
     </head>
-    <body>
+    <body data-theme="don">
+        <div class="corner">
+            <div class="corner-box">
+                <div class="corner-title">Theme</div>
+                <div class="theme-row">
+                    <button type="button" class="theme-btn active" data-theme-set="don" id="themeDon">Don (Gold)</button>
+                    <button type="button" class="theme-btn" data-theme-set="leaflit" id="themeLeaflit">Leaflit (AIMancer)</button>
+                </div>
+            </div>
+            <div class="corner-box">
+                <div class="corner-title">Get API keys</div>
+                <div class="api-links">
+                    <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">ChatGPT / OpenAI →</a>
+                    <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Gemini (Google AI) →</a>
+                    <a href="https://console.x.ai/" target="_blank" rel="noopener">Grok (xAI) →</a>
+                </div>
+            </div>
+        </div>
+
         <div class="container">
             <div class="logo">⚔️ Don's Adventurer</div>
-            <div class="subtitle">Angel's Sword Studios</div>
-            
-            <div class="tagline">
-                Reactive Overlay + VTuber Creator<br>
-                <span style="font-size:1.1rem; color:#8899aa;">Don's Adventurer • Overlay · Creator · Live2D · Music</span>
+            <div class="subtitle">Angel's Sword Studios · Combined Python Edition</div>
+            <div class="tagline">Overlay · Creator · Live2D · Music · AnimeGen</div>
+
+            <div class="path-note">
+                <strong>Video Prep</strong> lives in the <strong>Creator</strong> app (<code>/creator</code> → Video Prep tab), not in AnimeGen.<br>
+                AnimeGen writes MP4s to <code>animegen_public/outputs/</code>, then you can hand off into Creator Video Prep.
             </div>
-            
+
             <div class="cards">
                 <a href="/overlay" class="card">
                     <div class="card-icon">🎮</div>
                     <div class="card-title">Overlay</div>
-                    <div class="card-desc">
-                        Real-time reactive streaming overlay with face tracking, 
-                        expression detection, and advanced emote system.
-                    </div>
+                    <div class="card-desc">Real-time reactive streaming overlay with face tracking, expression detection, and emotes.</div>
                 </a>
-                
                 <a href="/creator" class="card">
                     <div class="card-icon">🎨</div>
                     <div class="card-title">Creator</div>
-                    <div class="card-desc">
-                        Full VTuber asset pipeline: Sprite Prep → AI Video Generation → 
-                        Video Prep → Transparent Export.
-                    </div>
+                    <div class="card-desc">Sprite Prep → AI Video → <strong>Video Prep</strong> → Transparent Export. Full VTuber asset pipeline.</div>
                 </a>
-
                 <a href="/live2d" class="card">
                     <div class="card-icon">🎭</div>
                     <div class="card-title">Model &amp; Rigging Suite</div>
-                    <div class="card-desc">
-                        Live2D models + Creator exports (PNG / WebM / GIF).
-                        View, play, tweak parameters or transform media.
-                    </div>
+                    <div class="card-desc">Live2D runtime viewer + Creator PNG/WebM media. Parameters, motions, presets.</div>
                 </a>
-
                 <a href="/music" class="card">
                     <div class="card-icon">🎵</div>
-                    <div class="card-title">Music &amp; Audio Workspace</div>
-                    <div class="card-desc">
-                        Suno AI generation, local library, trim/fade tools,
-                        and global BGM that keeps playing across the app.
-                    </div>
+                    <div class="card-title">Music &amp; Audio</div>
+                    <div class="card-desc">Suno generation, library, trim/fade, global BGM across the whole app.</div>
+                </a>
+                <a href="/animegen" class="card">
+                    <div class="card-icon">🌸</div>
+                    <div class="card-title">AnimeGen T2V</div>
+                    <div class="card-desc">AideaLab anime video (Wan 2.2). ComfyUI or local Diffusers for loops &amp; transitions.</div>
                 </a>
             </div>
-            
+
             <div class="credit">
                 Made by <strong>TheDonOfEverything</strong> aka <strong>Paul Conforti</strong><br>
                 Original by <strong>Leaflit</strong> • Angular improvements by <strong>OOzeClues</strong><br>
                 Angel's Sword Studios • 2026
             </div>
-            
             <div class="footer">
-                Everything runs locally on your PC • Supports Gemini • Grok • OpenAI • ComfyUI<br>
-                <span style="display:inline-block;margin-top:10px;">
-                    <a href="/health" style="color:#dbb858;margin:0 8px;">Health</a>
-                    <a href="/api/export/status" style="color:#dbb858;margin:0 8px;">Export Status</a>
-                    <a href="/api/comfyui/status" style="color:#dbb858;margin:0 8px;">ComfyUI Status</a>
-                    <a href="/api/ffmpeg/status" style="color:#dbb858;margin:0 8px;">ffmpeg Status</a>
-                </span>
+                Everything runs locally • Gemini • Grok • OpenAI • ComfyUI<br>
+                <a href="/health">Health</a> ·
+                <a href="/api/export/status">Export</a> ·
+                <a href="/api/comfy/status">ComfyUI</a> ·
+                <a href="/api/ffmpeg/status">ffmpeg</a>
             </div>
         </div>
         <script src="/shared/global-player.js"></script>
+        <script>
+          (function () {
+            const root = document.body;
+            function apply(theme) {
+              root.setAttribute('data-theme', theme);
+              localStorage.setItem('as_menu_theme', theme);
+              document.querySelectorAll('[data-theme-set]').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-theme-set') === theme);
+              });
+            }
+            const saved = localStorage.getItem('as_menu_theme') || 'don';
+            apply(saved);
+            document.querySelectorAll('[data-theme-set]').forEach(btn => {
+              btn.addEventListener('click', () => apply(btn.getAttribute('data-theme-set')));
+            });
+          })();
+        </script>
     </body>
     </html>
     """
     return html
+
+
 
 
 # ── Overlay Routes ────────────────────────────────────────────────────────
