@@ -28,6 +28,22 @@
   var difficulty = localStorage.getItem("as_tetris_diff") || "normal";
   var highScore = parseInt(localStorage.getItem("as_tetris_hi") || "0", 10) || 0;
   var ghostOn = localStorage.getItem("as_tetris_ghost") !== "0";
+  var sfxOn = localStorage.getItem("as_tetris_sfx") !== "0";
+  function beep(freq, dur) {
+    if (!sfxOn) return;
+    try {
+      var ctx = window.__asAudioCtx || (window.__asAudioCtx = new (window.AudioContext || window.webkitAudioContext)());
+      var o = ctx.createOscillator();
+      var g = ctx.createGain();
+      o.frequency.value = freq;
+      o.type = "square";
+      g.gain.value = 0.04;
+      o.connect(g); g.connect(ctx.destination);
+      o.start();
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + (dur || 0.05));
+      o.stop(ctx.currentTime + (dur || 0.06));
+    } catch (e) {}
+  }
 
   function themeColors() {
     var s = getComputedStyle(document.documentElement);
@@ -95,6 +111,7 @@
       }
     }
     if (cleared) {
+      beep(200 + cleared * 120, 0.08);
       var pts = [0, 100, 300, 500, 800][cleared] || 800;
       var d = DIFF[difficulty] || DIFF.normal;
       score += Math.round(pts * level * d.scoreMul);
@@ -165,6 +182,7 @@
       draw();
     } else {
       merge();
+      beep(90, 0.03);
       clearLines();
       spawn();
       draw();
@@ -176,6 +194,7 @@
     while (!collide(cx, cy + 1, cur.shape)) { cy++; dist++; }
     score += dist * 2;
     merge();
+    beep(90, 0.03);
     clearLines();
     spawn();
     draw();
@@ -368,6 +387,14 @@
       ghostOn = ghostEl.checked;
       localStorage.setItem("as_tetris_ghost", ghostOn ? "1" : "0");
       draw();
+    };
+  }
+  var sfxEl = document.getElementById("sfxToggle");
+  if (sfxEl) {
+    sfxEl.checked = sfxOn;
+    sfxEl.onchange = function () {
+      sfxOn = sfxEl.checked;
+      localStorage.setItem("as_tetris_sfx", sfxOn ? "1" : "0");
     };
   }
   document.addEventListener("keydown", function (e) {
