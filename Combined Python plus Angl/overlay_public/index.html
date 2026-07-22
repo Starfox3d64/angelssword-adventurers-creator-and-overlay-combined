@@ -13,6 +13,10 @@
 <script src="/shared/theme-nav.js"></script>
 </head>
 <body>
+  <div style="padding:6px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px">
+    <button type="button" class="btn sm" id="btnCopyObsUrl">📋 Copy OBS Browser Source URL</button>
+  </div>
+
   <div class="app">
     <!-- Header -->
     <header class="header">
@@ -744,5 +748,18 @@
 
 <script src="/shared/global-player.js"></script>
 <script src="/shared/theme-nav.js"></script>
+  <script src="/shared/shortcuts.js"></script>
+<script>
+(function(){
+  var btn=document.getElementById('btnCopyObsUrl');
+  var lab=document.getElementById('obsUrlText');
+  var url=location.origin+'/overlay';
+  if(lab) lab.textContent=url;
+  if(btn) btn.onclick=function(){
+    navigator.clipboard.writeText(url).then(function(){btn.textContent='✓ Copied'; setTimeout(function(){btn.textContent='📋 Copy URL';},1500);})
+      .catch(function(){prompt('Copy this URL for OBS Browser Source:', url);});
+  };
+})();
+</script>
 </body>
 </html>
