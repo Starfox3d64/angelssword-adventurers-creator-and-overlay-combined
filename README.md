@@ -1,10 +1,10 @@
 # ⚔️ Don's Adventurer
 
-**Overlay · Creator · Live2D Model Suite · Music & Audio** — one local Python app.
+**Overlay · Creator · Live2D · Music · AnimeGen · Tetris** — one local Python app.
 
 **Made by TheDonOfEverything aka Paul Conforti**  
 Original JavaScript by **Leaflit** · Angular v0.3.0 by **OOzeClues**  
-Python Combined Edition · **v2.3** · 2026
+Python Combined Edition · **v2.5** · July 2026
 
 > Runs 100% on your PC. No Node.js required.
 
@@ -12,14 +12,17 @@ Python Combined Edition · **v2.3** · 2026
 
 ## What's Inside
 
-| Tool | URL | Description |
-|------|-----|-------------|
-| **Main Menu** | http://localhost:3000 | Hub for all suites |
-| **🎮 Overlay** | /overlay | Face tracking, expressions, emotes, WebSocket control |
-| **🎨 Creator** | /creator | Sprite Prep → AI Video → Video Prep → Transparent Export |
-| **🎭 Model & Rigging** | /live2d | Live2D runtime viewer + Creator media (PNG/WebM/GIF) |
-| **🎵 Music & Audio** | /music | Suno generation, library, trim/fade, **global BGM** |
-| **🌸 AnimeGen T2V** | /animegen | AideaLab anime video (Wan 2.2) via ComfyUI or local Diffusers |
+| Suite | URL | Description |
+|-------|-----|-------------|
+| **Main Menu** | http://localhost:3000 | Hub, theme picker, suite cards |
+| **🎮 Overlay** | `/overlay` | Face tracking, expressions, emotes, WebSocket control, notes |
+| **🎨 Creator** | `/creator` | Sprite Prep → AI Video → Video Prep → Transparent Export |
+| **🎭 Model & Rigging** | `/live2d` | Live2D runtime viewer + Media mode (PNG/WebM/MP4) |
+| **🎵 Music & Audio** | `/music` | Suno generation, library, trim/fade, **global BGM** |
+| **🌸 AnimeGen T2V** | `/animegen` | AideaLab anime video (Wan 2.2) via ComfyUI or Diffusers |
+| **🧱 Tetris** | `/tetris` | Theme-aware Tetris with difficulty, speed, hold, ghost |
+
+Every suite has **suite navigation**, **session notes** (📌), and the **global music mini-player** when BGM is active.
 
 ---
 
@@ -54,6 +57,32 @@ Open **http://localhost:3000**
 
 ---
 
+## Global Features
+
+### Themes (apply everywhere)
+| Theme | Look |
+|-------|------|
+| **Don (Gold)** | Default — antique gold / rose / void black |
+| **Leaflit** | Blue primary + **cape/hat red** accents |
+| **Ooz** | Cyan / magenta slime aesthetic |
+| **Original Adventurer** | Classic purple + gold |
+
+Pick a theme on the **main menu**. It is stored in `localStorage` and applied on every suite via `/shared/theme-nav.js` + `/shared/theme.css`.
+
+### Global BGM
+1. Open **Music & Audio**  
+2. Generate or load a track  
+3. Click **Set as Active Global BGM**  
+4. Navigate anywhere — the mini-player keeps playing  
+
+### Session Notes
+Floating **📌** button on Models, Music, AnimeGen, Tetris (Creator & Overlay have built-in notes). Notes sync in `localStorage` across pages.
+
+### Suite navigation
+Header links on every page: Menu · Creator · Overlay · Models · Music · AnimeGen · Tetris.
+
+---
+
 ## AI Providers (Creator)
 
 | Feature | Providers |
@@ -68,104 +97,182 @@ API keys stay in **browser localStorage**. Proxies run on the local Python serve
 
 ## Live2D Model Suite
 
-### Supported
+### Live2D mode
 - Runtime packages: **`.model3.json` + `.moc3` + texture PNGs** (+ motions / physics)
 - Zip upload of runtime folders  
-- Creator exports: **PNG, WebM, GIF, MP4** (Media mode)  
-- Parameter sliders, parts opacity, motion play, pose presets  
-- Screenshot, fit/center/zoom, BG color (black / green / magenta / checker)  
+- Parameter sliders, parts, physics, motion play, pose presets  
+- Center / zoom / physics toggle / loop motion  
+
+### Media mode
+- **Open Image / Video** or drag PNG · JPG · WebP · GIF · WebM · MP4 · MOV into the viewport  
+- Transform: **scale, offset X/Y, rotation, opacity**  
+- Play / Pause / Reset  
+- Creator Media Library (`live2d_public/media/`)  
+- Export helpers (VTS / frames — where supported by server)
 
 ### Not supported
-- **`.cmo3` / `.can3`** Cubism Editor projects  
-
-**How to export from Cubism Editor:**  
-`File → Export for Runtime` → put the folder in `live2d_public/models/YourModel/` or import in the UI.
-
-### QoL
-- Load timeout (no silent freeze)  
-- Parameter search filter  
-- Double-click parameter name to reset  
-- Shortcuts: `Space` play motion, `0` center, `+` / `-` zoom  
-- Help button in status bar  
+- **`.cmo3` / `.can3`** Cubism Editor projects — use **File → Export for Runtime** in Cubism first  
 
 ---
 
 ## Music & Audio Workspace
 
-- **Suno-compatible API** (set Base URL + API key) — Standard / Custom / BGM modes  
-- Local **MP3/WAV** library (upload, play, delete)  
-- **Trim + fade** with waveform → export WAV to library  
-- **Global BGM**: keeps playing while you use Creator, Overlay, Models, or the menu  
-- Mini-player on every page: play/pause, stop, seek, volume, mute  
-- Random Global BGM, quick volume presets  
-
-Library folder: `music_public/library/`
+- Suno API key (stored locally)  
+- Prompt / generation suite  
+- Local MP3 / WAV library  
+- Scrubber, volume, loop  
+- Trim + fade-in / fade-out  
+- **Set as Active Global BGM** for app-wide playback  
 
 ---
 
-## Overlay
+## AnimeGen T2V
 
-- VTube Studio / iFacialMocap / Webcam sources  
-- Expression thresholds + presets (Sensitive / Balanced / Strict)  
-- Emotes, Quick Actions, session notes, hotkeys  
-- WebSocket control on port **3001**  
-
-Models: `overlay_public/assets/models/YourCharacter/`
+- AideaLab **AnimeGen** (Wan 2.2 based)  
+- Local Diffusers or ComfyUI backend  
+- Download links for High Noise / Low Noise model weights  
+- Handoff path toward Creator Video Prep  
 
 ---
 
+## Tetris
 
+| Control | Action |
+|---------|--------|
+| ← → | Move |
+| ↑ or X | Rotate (wall kicks) |
+| ↓ | Soft drop |
+| Space | Hard drop |
+| C / Shift | Hold piece |
+| P | Pause |
+| R / Enter | Restart |
 
-## AnimeGen T2V (AideaLab)
-
-Local anime video generation based on **Wan 2.2**, trained with ethically sourced studio data ([Hugging Face](https://huggingface.co/aidealab/AnimeGen-T2V)).
-
-- **ComfyUI (recommended):** run your Wan/AnimeGen graph; put finished MP4s in `animegen_public/outputs/`
-- **Diffusers (CUDA):** place `high_noise.safetensors` + `low_noise.safetensors` in `animegen_public/models/`, install torch/diffusers, use the AnimeGen tab
-- Prompting tip: Japanese prompts + Wan-style negatives work best; English is OK with “Japanese anime style,” prefix
-- Presets for idle / wave / talk / walk loops aimed at Adventurer pipeline
-- **Send to Creator** hands the MP4 URL into Video Prep via localStorage
-
-## ComfyUI
-
-1. Start ComfyUI (`http://127.0.0.1:8188`)  
-2. Creator → Settings → Local ComfyUI → Connect / Refresh models  
-3. Choose **Local ComfyUI** as generation source  
-
----
-
-## ffmpeg (transparent WebM)
-
-Auto-download on Windows into `creator_public/bin/`, or place your own binary there.  
-Linux/macOS: install system ffmpeg (`apt install ffmpeg` / `brew install ffmpeg`) or put a binary in `creator_public/bin/`.
+**Difficulty:** Easy · Normal · Hard · Insane (saved)  
+**Speed:** Auto from difficulty/level, or manual slider override  
+**Ghost piece:** Toggle landing preview  
+**High score:** Saved in `localStorage`  
+Blocks follow the **active theme** colors.
 
 ---
 
-## Folder Map
+## Project Layout
 
 ```
-Don's Adventurer/
-├── server.py
-├── Start AS Adventurer.bat          # Windows
-├── start-dons-adventurer.sh         # Linux
-├── start-dons-adventurer.command    # macOS
+as-adventurer-combined-python/
+├── server.py                 # Flask app (port 3000)
 ├── requirements.txt
-├── shared/global-player.js          # Persistent BGM mini-player
-├── creator_public/                  # Creator UI
-├── overlay_public/                  # Overlay UI
-├── live2d_public/                   # Model suite
-│   ├── models/                      # Live2D runtime folders
-│   └── media/                       # Creator image/video imports
-└── music_public/
-    └── library/                     # Audio library
+├── Start AS Adventurer.bat   # Windows
+├── start-dons-adventurer.sh  # Linux
+├── start-dons-adventurer.command  # macOS
+├── shared/
+│   ├── theme.css             # Global theme tokens
+│   ├── theme-nav.js          # Theme apply + persistence
+│   ├── global-player.js      # Cross-suite BGM mini-player
+│   └── notes.js              # Floating session notes
+├── creator_public/
+├── overlay_public/
+├── live2d_public/
+│   ├── media/                # Uploaded Creator media
+│   └── models/               # Live2D runtime packages
+├── music_public/
+├── animegen_public/
+│   ├── models/               # AnimeGen weights
+│   └── outputs/
+└── tetris_public/
+```
+
+---
+
+## Requirements
+
+- **Python 3.9+**
+- **ffmpeg** on PATH (recommended for true-alpha WebM export)
+- Optional: **ComfyUI** on `127.0.0.1:8188` for local gen
+- Optional: API keys for OpenAI / Gemini / Grok / Suno
+
+```bash
+pip install -r requirements.txt
 ```
 
 ---
 
 ## Credits
 
-- **TheDonOfEverything aka Paul Conforti** — Python Combined Edition, Live2D suite, Music suite, global audio  
-- **Leaflit** — Original JavaScript version  
-- **OOzeClues** — Angular improvements (v0.3.0)  
+- **TheDonOfEverything (Paul Conforti)** — Python combined edition, suites, themes, Tetris, integration  
+- **Leaflit** — original Adventurer JavaScript  
+- **OOzeClues** — Angular Edition v0.3.0  
+- **AideaLab / AnimeGen** — T2V model (ethical studio data, Wan 2.2 lineage)  
 
-God bless your streams. ⚔️
+---
+
+# Patch Notes — v2.5 (July 22, 2026 session)
+
+*Everything new or fixed in the last few hours of development.*
+
+## Themes & UI chrome
+- **Four global themes:** Don (Gold), Leaflit, Ooz, Original Adventurer  
+- Theme switch on main menu applies to **all** suites (not only Tetris)  
+- **Leaflit:** stronger **cape/hat red** on accents, borders, and secondary colors alongside blue  
+- Hardcoded gold hex/rgba in Creator CSS mapped to CSS variables so themes can recolor panels and buttons  
+- Creator body/header no longer locked to pure `#030303`; uses `--bg-deep` / `--bg-panel` with theme-tinted glows  
+- AnimeGen & Live2D styles rewritten to use `--as-*` / theme tokens (no circular CSS variables)  
+- Shared `/shared/theme.css` + `/shared/theme-nav.js` with re-apply after late page CSS loads  
+
+## Navigation & shared widgets
+- Full suite nav on **Creator, Overlay, Models, Music, AnimeGen, Tetris**  
+- **Global music mini-player** themed (accent follows Don/Ooz/Leaflit/Original)  
+- Compact original player layout restored (not a broken full-bleed bar)  
+- **📌 Session Notes** on Models, Music, AnimeGen, Tetris (shared `notes.js`)  
+- World **clock** on Tetris top nav  
+
+## Creator
+- Layout restored after path/critical-CSS issues (`/creator/style.css` absolute + cache bust)  
+- Theme-aware polish rules (no force-black `!important` backgrounds)  
+- Full header nav + shortcuts preserved  
+
+## Model & Rigging Suite (Live2D)
+- **Media mode** switch fixed (was a no-op due to null canvas / script order)  
+- **Open Image / Video** file picker fixed (fresh input each open — dialog selection now loads)  
+- **Drag/drop** PNG/WebM/MP4 onto viewport or dropzone  
+- Transform sliders: scale, offset X/Y, rotation, opacity  
+- Play / Pause / Reset for video  
+- Media stage forced above Live2D canvas (z-index / visibility)  
+- Video load path (controls, muted autoplay fallback)  
+- Creator Media Library button + empty-state messaging  
+- Tips for Media vs Live2D runtime packages  
+- Timeline / motion bar layout restored (no longer crushed by global player)  
+
+## Music
+- Global BGM tip (dismissible) explaining cross-suite playback  
+- Nav + notes + themed player  
+
+## AnimeGen
+- Theme-aware stylesheet  
+- Model download links in UI (High / Low noise)  
+- Suite nav + notes  
+
+## Tetris (major feature pass)
+- **Difficulty:** Easy · Normal · Hard · Insane (persisted)  
+- **Drop speed:** auto from difficulty/level, or manual slider override  
+- **Ghost piece** toggle (persisted)  
+- **Hold piece** (`C` / Shift)  
+- **High score** in `localStorage`  
+- Wall kicks on rotate  
+- Soft/hard drop score bonuses + difficulty score multiplier  
+- Theme-colored blocks via `--as-tetris-1…7`  
+- HUD: score, high score, lines, level, drop ms, status, difficulty label  
+- Full suite nav + clock + notes  
+
+## Infrastructure
+- Absolute asset paths for suite CSS/JS where relative + `<base>` caused 404s  
+- `/live2d/`, `/creator/`, `/animegen/` trailing-slash friendly routes  
+- Shared static: `theme.css`, `theme-nav.js`, `global-player.js`, `notes.js`  
+
+## Known limits
+- Live2D **editor** files (`.cmo3` / `.can3`) are not runtime-loadable — export from Cubism first  
+- AnimeGen local Diffusers needs CUDA + weights on disk  
+- VTS/frames export depends on server routes and available assets  
+
+---
+
+**God Bless — stream safe.**
