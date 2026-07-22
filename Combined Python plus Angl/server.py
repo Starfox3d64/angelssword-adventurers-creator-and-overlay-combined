@@ -2032,15 +2032,16 @@ def landing():
                     #07141c;
             }
             [data-theme="original"] {
-                --bg-deep: #0f1419;
-                --bg-panel: rgba(26, 35, 50, 0.95);
-                --accent: #4ecdc4;
-                --accent-2: #ff6b6b;
-                --accent-glow: rgba(78, 205, 196, 0.35);
-                --text: #e8eef5;
-                --text-muted: #8899aa;
-                --card-border: rgba(78, 205, 196, 0.3);
-                --bg-image: radial-gradient(ellipse at 50% 0%, rgba(78,205,196,0.12) 0%, transparent 50%), #0f1419;
+                --bg-deep: #120a1c;
+                --bg-panel: rgba(28, 18, 40, 0.95);
+                --accent: #d4af37;
+                --accent-2: #9b59b6;
+                --accent-glow: rgba(212, 175, 55, 0.4);
+                --text: #f5e6ff;
+                --text-muted: #b8a0c8;
+                --card-border: rgba(155, 89, 182, 0.4);
+                --bg-image: radial-gradient(ellipse at 50% 0%, rgba(155,89,182,0.22) 0%, transparent 50%),
+                    radial-gradient(ellipse at 80% 80%, rgba(212,175,55,0.12) 0%, transparent 40%), #120a1c;
             }
             body {
                 background: var(--bg-image);
@@ -2158,7 +2159,7 @@ def landing():
                     <button type="button" class="theme-btn active" data-theme-set="don">Don (Gold)</button>
                     <button type="button" class="theme-btn" data-theme-set="leaflit">Leaflit</button>
                     <button type="button" class="theme-btn" data-theme-set="ooz">Ooz</button>
-                    <button type="button" class="theme-btn" data-theme-set="original">Original</button>
+                    <button type="button" class="theme-btn" data-theme-set="original">Original (Purple/Gold)</button>
                 </div>
             </div>
             <div class="corner-box">
@@ -2174,7 +2175,7 @@ def landing():
         <div class="container">
             <div class="logo">⚔️ Don's Adventurer</div>
             <div class="subtitle">Angel's Sword Studios · Combined Python Edition</div>
-            <div class="tagline">Overlay · Creator · Live2D · Music · AnimeGen</div>
+            <div class="tagline">Overlay · Creator · Live2D · Music · AnimeGen · Tetris</div>
 
 
             <div class="cards">
@@ -2202,6 +2203,11 @@ def landing():
                     <div class="card-icon">🌸</div>
                     <div class="card-title">AnimeGen T2V</div>
                     <div class="card-desc">AideaLab anime video (Wan 2.2). ComfyUI or local Diffusers for loops &amp; transitions.</div>
+                </a>
+                <a href="/tetris" class="card">
+                    <div class="card-icon">🧱</div>
+                    <div class="card-title">Tetris</div>
+                    <div class="card-desc">Playable classic Tetris. Block colors follow your active theme (Don / Leaflit / Ooz / Original).</div>
                 </a>
             </div>
 
@@ -2259,6 +2265,7 @@ def overlay_files(filename):
 
 # ── Creator Routes ────────────────────────────────────────────────────────
 @app.route("/creator")
+@app.route("/creator/")
 def creator_index():
     return send_from_directory(CREATOR_PUBLIC, "index.html")
 
