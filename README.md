@@ -83,6 +83,15 @@ Header links on every page: Menu · Creator · Overlay · Models · Music · Ani
 
 ---
 
+## Export (Creator → Model Exporter)
+
+- **CPU mode (default):** frames as PNG → server ffmpeg VP9+alpha WebM  
+- **GPU / RGBA mode:** raw RGBA buffers → ffmpeg (Angular **0.4.0** parity — avoids rare PNG→VP9 artefacts)  
+- Toggle in **Creator → Settings → WebM Export Render Mode**  
+- WebGPU availability is detected and shown in Settings  
+
+---
+
 ## AI Providers (Creator)
 
 | Feature | Providers |
@@ -120,7 +129,7 @@ API keys stay in **browser localStorage**. Proxies run on the local Python serve
 - Suno API key (stored locally)  
 - Prompt / generation suite  
 - Local MP3 / WAV library  
-- Scrubber, volume, loop  
+- Scrubber, volume, loop, **playback speed 0.5×–2×**  
 - Trim + fade-in / fade-out  
 - **Set as Active Global BGM** for app-wide playback  
 
